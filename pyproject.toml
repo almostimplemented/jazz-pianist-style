@@ -17,6 +17,8 @@ dependencies = [
     "safetensors>=0.4.0",
     "huggingface-hub>=0.23.0",
     "tqdm>=4.66.0",
+    "transformers>=4.40.0",
+    "accelerate>=0.20.0",
     "aria",
     "ariautils",
 ]
@@ -28,6 +30,11 @@ ariautils = { git = "https://github.com/EleutherAI/aria-utils.git", rev = "4ed07
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["llama_pijama"]
