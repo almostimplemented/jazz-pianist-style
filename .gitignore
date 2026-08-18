@@ -7,3 +7,7 @@ checkpoints/
 outputs/
 .cache/
 .DS_Store
+data/resnet_transfer/
+data/eval/
+results/
+samples/
