@@ -198,6 +198,8 @@ class CrossAttentionInferenceLM(nn.Module):
         dtype=torch.bfloat16,
     ):
         head_dim = self.model_config.d_model // self.model_config.n_heads
+        # Cache tensors live wherever the model does (CUDA, MPS, or CPU).
+        device = next(self.parameters()).device
         for block in self.model.encode_layers:
             block.kv_cache = KVCache(
                 max_batch_size=batch_size,
@@ -205,15 +207,15 @@ class CrossAttentionInferenceLM(nn.Module):
                 n_heads=self.model_config.n_heads,
                 head_dim=head_dim,
                 dtype=dtype,
-            ).cuda()
+            ).to(device)
 
         self.model.freqs_cis = precompute_freqs_cis(
             seq_len=max_seq_len,
             n_elem=head_dim,
             base=500000,
             dtype=dtype,
-        ).cuda()
+        ).to(device)
 
         self.model.causal_mask = torch.tril(
             torch.ones(max_seq_len, max_seq_len, dtype=torch.bool)
-        ).cuda()
+        ).to(device)
