@@ -71,6 +71,9 @@
     font-family: inherit; font-size: .92rem; transition: all .15s;
   }
   .artists button:hover { border-color: var(--accent-dim); color: var(--ink); }
+  .artists .meta { display: block; font-family: var(--mono); font-size: .68rem;
+                   color: var(--ink-dim); margin-top: .2rem; letter-spacing: .01em; }
+  .artists button[aria-pressed="true"] .meta { color: var(--accent-dim); }
   .artists button[aria-pressed="true"] {
     border-color: var(--accent); color: var(--accent); background: #221a0d;
   }
@@ -100,8 +103,9 @@
   <p class="lede">
     The first few bars are a human performance of &ldquo;Ain&rsquo;t Misbehavin&rsquo;&rdquo;.
     Everything after the marked branch point is generated, conditioned on one of
-    twelve jazz pianists. Because every continuation grows from the same prompt,
-    you can change pianist <em>while it plays</em> and hear the style hand over.
+    twelve jazz pianists &mdash; twelve takes of the same opening. Switch between
+    them as it plays and you stay at the same moment in the music, hearing how
+    each pianist carries the tune on.
   </p>
 
   <div class="player">
@@ -118,7 +122,11 @@
   </div>
 
   <div class="artists" id="artists" role="group" aria-label="Choose a pianist"></div>
-  <p class="hint">Switching mid-performance keeps the clock running &mdash; the music continues from where you are, in the new pianist&rsquo;s style.</p>
+  <p class="hint">
+    Every take generates the same number of notes, so they end at different
+    times: Erroll Garner packs them into 1:26, Cedar Walton spreads them across
+    2:45. That difference in density is itself part of a pianist&rsquo;s signature.
+  </p>
   <p class="status" id="status">Loading&hellip;</p>
 </section>
 

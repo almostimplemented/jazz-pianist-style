@@ -39,8 +39,7 @@
   let startedAt = 0;       // Tone context time when playback (re)started
   let offsetMs = 0;        // position in the piece at that moment
   let scheduledMs = 0;     // notes strictly before this are already scheduled
-  let durationMs = 1;      // longest continuation: one shared timeline for all
-  let segments = [];       // [{from, artist}] — what actually played, in order
+  let durationMs = 1;      // the selected take's own length
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const fmt = (ms) => {
@@ -128,10 +127,6 @@
     const wasPlaying = playing;
     if (wasPlaying) stop();
     offsetMs = clamp(ms, 0, durationMs);
-    segments = segments.filter((seg) => seg.from < offsetMs);
-    if (!segments.length || segments[segments.length - 1].artist !== active) {
-      segments.push({ from: offsetMs, artist: active });
-    }
     if (wasPlaying) play();
     draw();
   }
@@ -144,15 +139,17 @@
     el.current.textContent = a.name;
     [...el.artists.children].forEach((b, i) =>
       b.setAttribute("aria-pressed", String(i === idx)));
-    // Hand over immediately: keep whatever is already sounding, take new notes
-    // from this stream starting now. The switch point is recorded so the roll
-    // keeps showing what was actually heard before it.
+    // Each take has its own length: keep the listener at the same moment in
+    // the music, and rescale the timeline to the take they are now hearing.
+    durationMs = a.duration_ms;
+    el.seek.max = String(durationMs);
     const at = nowMs();
-    segments = segments.filter((seg) => seg.from < at);
-    if (!segments.length || segments[segments.length - 1].artist !== idx) {
-      segments.push({ from: at, artist: idx });
+    if (at >= durationMs) {          // this take is already over by that point
+      stop();
+      offsetMs = durationMs;
+    } else if (playing) {
+      scheduledMs = at;
     }
-    if (playing) scheduledMs = at;
     draw();
   }
 
@@ -202,21 +199,14 @@
       ctx.fillText("model takes over", bx + 6, 14);
     }
 
-    // notes, drawn per segment so the played past stays truthful after a swap
+    // notes of the selected take
     const noteH = Math.max(2.5, (h - 8) / (HI - LO) * 1.6);
-    const spans = segments.map((seg, i) => ({
-      artist: seg.artist,
-      from: seg.from,
-      to: i + 1 < segments.length ? segments[i + 1].from : Infinity,
-    }));
-    for (const span of spans) {
-      if (span.to < from || span.from > to) continue;
-      const notes = data.artists[span.artist].notes;
+    {
+      const notes = data.artists[active].notes;
       for (let i = 0; i < notes.length; i += 4) {
       const start = notes[i], dur = notes[i + 1], pitch = notes[i + 2], vel = notes[i + 3];
       if (start + dur < from) continue;
       if (start > to) break;
-      if (start < span.from || start >= span.to) continue;
       const x = xOf(start), wpx = Math.max(2, (dur / WINDOW_MS) * w);
       const y = yOf(pitch);
       const isPrompt = start < data.branch_ms;
@@ -240,19 +230,6 @@
     }
     ctx.globalAlpha = 1;
 
-    // seams: where the listener changed pianist
-    ctx.font = "11px ui-monospace, monospace";
-    for (const seg of segments.slice(1)) {
-      const sx = xOf(seg.from);
-      if (sx < -60 || sx > w + 60) continue;
-      ctx.strokeStyle = COLOR.gen;
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = COLOR.gen;
-      ctx.fillText("\u2192 " + data.artists[seg.artist].name, sx + 5, h - 8);
-    }
-
     // playhead
     const px = Math.round(w * PLAYHEAD_FRAC) + 0.5;
     ctx.strokeStyle = "#fff";
@@ -264,8 +241,7 @@
   function frame() {
     draw();
     const cur = nowMs();
-    const ended = data && cur > data.artists[active].duration_ms;
-    el.time.textContent = `${fmt(cur)} / ${fmt(durationMs)}${ended ? " · ended" : ""}`;
+    el.time.textContent = `${fmt(cur)} / ${fmt(durationMs)}`;
     if (document.activeElement !== el.seek) el.seek.value = String(Math.round(cur));
     requestAnimationFrame(frame);
   }
@@ -289,15 +265,15 @@
       data = payload;
       data.artists.forEach((a, i) => {
         const b = document.createElement("button");
-        b.textContent = a.name;
+        const secs = a.duration_ms / 1000;
+        b.innerHTML = `${a.name}<span class="meta">${fmt(a.duration_ms)}` +
+                      ` &middot; ${(a.n_notes / secs).toFixed(1)} notes/s</span>`;
+        b.title = `${a.n_notes} notes in ${secs.toFixed(1)}s`;
         b.setAttribute("aria-pressed", "false");
         b.addEventListener("click", () => setArtist(i));
         el.artists.appendChild(b);
       });
-      durationMs = Math.max(...data.artists.map((a) => a.duration_ms));
-      el.seek.max = String(durationMs);
       resize();
-      segments = [];
       setArtist(0);
       el.status.textContent = "";
       requestAnimationFrame(frame);
