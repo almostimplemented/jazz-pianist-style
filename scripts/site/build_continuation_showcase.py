@@ -239,6 +239,19 @@ def main():
                     duration = max(notes[i] + notes[i+1] for i in range(0, len(notes), 4))
             else:
                 notes, duration = notes_from_ids(ids, tokenizer)
+            # Mid-track prompt chunks decode with leading silence (their first
+            # onset sits partway into a timing segment). Trim it so playback
+            # starts promptly, keeping a short natural lead-in.
+            LEAD_MS = 250
+            starts = [n[i] for n in (prompt_notes, notes) for i in range(0, len(n), 4)]
+            if starts:
+                delta = min(starts) - LEAD_MS
+                if delta > 0:
+                    for arr in (prompt_notes, notes):
+                        for i in range(0, len(arr), 4):
+                            arr[i] -= delta
+                    branch = max(branch - delta, 0)
+                    duration -= delta
             takes.append({
                 "sample_idx": sample_idx,
                 "prompt_title": Path(src.get("track_id", "")).stem,
