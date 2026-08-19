@@ -8,7 +8,8 @@
   "use strict";
 
   const DATA_URL = "data/aint_misbehavin.json";
-  const LOOKAHEAD_MS = 150;   // schedule this far ahead of the playhead
+  const LOOKAHEAD_VISIBLE_MS = 150;  // responsive swaps while watching
+  const LOOKAHEAD_HIDDEN_MS = 3000;  // background tabs clamp timers to ~1s
   const WINDOW_MS = 8000;     // piano-roll time span
   const PLAYHEAD_FRAC = 0.28; // playhead position within that span
 
@@ -39,6 +40,7 @@
   let offsetMs = 0;        // position in the piece at that moment
   let scheduledMs = 0;     // notes strictly before this are already scheduled
   let durationMs = 1;      // longest continuation: one shared timeline for all
+  let segments = [];       // [{from, artist}] — what actually played, in order
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const fmt = (ms) => {
@@ -84,7 +86,7 @@
   function pump() {
     if (!playing || !sampler) return;
     const cur = nowMs();
-    const until = cur + LOOKAHEAD_MS;
+    const until = cur + (document.hidden ? LOOKAHEAD_HIDDEN_MS : LOOKAHEAD_VISIBLE_MS);
     const notes = data.artists[active].notes;
     const t0 = Tone.now();
 
@@ -126,6 +128,10 @@
     const wasPlaying = playing;
     if (wasPlaying) stop();
     offsetMs = clamp(ms, 0, durationMs);
+    segments = segments.filter((seg) => seg.from < offsetMs);
+    if (!segments.length || segments[segments.length - 1].artist !== active) {
+      segments.push({ from: offsetMs, artist: active });
+    }
     if (wasPlaying) play();
     draw();
   }
@@ -139,10 +145,14 @@
     [...el.artists.children].forEach((b, i) =>
       b.setAttribute("aria-pressed", String(i === idx)));
     // Hand over immediately: keep whatever is already sounding, take new notes
-    // from this stream starting now.
-    if (playing) {
-      scheduledMs = nowMs();
+    // from this stream starting now. The switch point is recorded so the roll
+    // keeps showing what was actually heard before it.
+    const at = nowMs();
+    segments = segments.filter((seg) => seg.from < at);
+    if (!segments.length || segments[segments.length - 1].artist !== idx) {
+      segments.push({ from: at, artist: idx });
     }
+    if (playing) scheduledMs = at;
     draw();
   }
 
@@ -192,12 +202,21 @@
       ctx.fillText("model takes over", bx + 6, 14);
     }
 
-    // notes
+    // notes, drawn per segment so the played past stays truthful after a swap
     const noteH = Math.max(2.5, (h - 8) / (HI - LO) * 1.6);
-    for (let i = 0; i < notes.length; i += 4) {
+    const spans = segments.map((seg, i) => ({
+      artist: seg.artist,
+      from: seg.from,
+      to: i + 1 < segments.length ? segments[i + 1].from : Infinity,
+    }));
+    for (const span of spans) {
+      if (span.to < from || span.from > to) continue;
+      const notes = data.artists[span.artist].notes;
+      for (let i = 0; i < notes.length; i += 4) {
       const start = notes[i], dur = notes[i + 1], pitch = notes[i + 2], vel = notes[i + 3];
       if (start + dur < from) continue;
       if (start > to) break;
+      if (start < span.from || start >= span.to) continue;
       const x = xOf(start), wpx = Math.max(2, (dur / WINDOW_MS) * w);
       const y = yOf(pitch);
       const isPrompt = start < data.branch_ms;
@@ -217,8 +236,22 @@
         ctx.fillStyle = "#fff";
         ctx.fill();
       }
+      }
     }
     ctx.globalAlpha = 1;
+
+    // seams: where the listener changed pianist
+    ctx.font = "11px ui-monospace, monospace";
+    for (const seg of segments.slice(1)) {
+      const sx = xOf(seg.from);
+      if (sx < -60 || sx > w + 60) continue;
+      ctx.strokeStyle = COLOR.gen;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = COLOR.gen;
+      ctx.fillText("\u2192 " + data.artists[seg.artist].name, sx + 5, h - 8);
+    }
 
     // playhead
     const px = Math.round(w * PLAYHEAD_FRAC) + 0.5;
@@ -229,7 +262,6 @@
   }
 
   function frame() {
-    pump();
     draw();
     const cur = nowMs();
     const ended = data && cur > data.artists[active].duration_ms;
@@ -265,9 +297,13 @@
       durationMs = Math.max(...data.artists.map((a) => a.duration_ms));
       el.seek.max = String(durationMs);
       resize();
+      segments = [];
       setArtist(0);
       el.status.textContent = "";
       requestAnimationFrame(frame);
+      // Audio runs on a timer, not the animation frame: hidden tabs stop
+      // painting, and playback must not stop with them.
+      setInterval(pump, 50);
     })
     .catch((err) => {
       el.status.textContent = "Could not load the performance data.";
