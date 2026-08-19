@@ -82,6 +82,52 @@
   footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
            color: var(--ink-dim); font-size: .9rem; }
   code { font-family: var(--mono); font-size: .85em; color: var(--accent); }
+
+  /* scored continuations */
+  .showcase { display: grid; grid-template-columns: minmax(11rem, 15rem) 1fr; gap: 1rem;
+              background: var(--bg-raised); border: 1px solid var(--line);
+              border-radius: var(--radius); padding: 1.25rem; }
+  .sc-list { display: flex; flex-direction: column; gap: .3rem; max-height: 26rem; overflow-y: auto; }
+  .sc-list button { display: grid; grid-template-columns: 1.6rem 1fr auto; align-items: center;
+                    gap: .5rem; background: none; border: 1px solid transparent; color: var(--ink-dim);
+                    border-radius: 6px; padding: .45rem .5rem; cursor: pointer; text-align: left;
+                    font-family: inherit; font-size: .88rem; }
+  .sc-list button:hover { border-color: var(--line); color: var(--ink); }
+  .sc-list button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent);
+                                         background: #221a0d; }
+  .sc-list .idx { font-family: var(--mono); font-size: .7rem; opacity: .6; }
+  .sc-list .ag { font-family: var(--mono); font-size: .72rem; opacity: .75; }
+  .sc-list .take { font-family: var(--mono); font-size: .62rem; color: var(--prompt); }
+  .sc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+             flex-wrap: wrap; margin-bottom: .8rem; }
+  .sc-label b { font-size: 1.1rem; }
+  .sc-label .sub { display: block; color: var(--ink-dim); font-size: .85rem; margin-top: .15rem; }
+  .sc-label .masked { color: var(--ink-dim); font-style: italic; }
+  .sc-label .tag { font-family: var(--mono); font-size: .68rem; color: var(--prompt);
+                   border: 1px solid var(--line); border-radius: 999px; padding: .1rem .45rem; }
+  .sc-score { text-align: right; }
+  .sc-score .big { display: block; font-size: 1.6rem; color: var(--accent); line-height: 1.1; }
+  .sc-score .cap { font-family: var(--mono); font-size: .65rem; color: var(--ink-dim); }
+  .sc-strip { display: flex; gap: 2px; height: 2.2rem; margin-bottom: .4rem; }
+  .sc-strip .cell { flex: 1; border-radius: 2px; background: var(--accent); }
+  .sc-strip .cell.miss { background: #7d5a72; }
+  .sc-strip.masked .cell { background: var(--line) !important; opacity: 1 !important; }
+  .sc-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-family: var(--mono);
+               font-size: .68rem; color: var(--ink-dim); margin-bottom: .8rem; }
+  .sc-legend .right { margin-left: auto; }
+  .sw { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px;
+        background: var(--accent); vertical-align: -1px; margin-right: .2rem; }
+  .sw.miss { background: #7d5a72; }
+  .guess { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+  .guess button { background: none; border: 1px solid var(--line); color: var(--ink-dim);
+                  border-radius: 999px; padding: .3rem .7rem; cursor: pointer;
+                  font-family: inherit; font-size: .82rem; }
+  .guess button:hover { border-color: var(--accent); color: var(--accent); }
+  .verdict { margin-top: .6rem; padding: .7rem .9rem; border-radius: 8px; font-size: .92rem;
+             border: 1px solid var(--line); }
+  .verdict.right { border-color: var(--accent); background: #1e1809; }
+  .verdict.wrong { border-color: #6c4a60; background: #1d1319; }
+  @media (max-width: 40rem) { .showcase { grid-template-columns: 1fr; } }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -93,6 +139,7 @@
   <p class="venue">ISMIR 2026, Abu Dhabi</p>
   <div class="links">
     <a href="#demo">Listen</a>
+    <a href="#scored">Scored takes</a>
     <a href="https://github.com/almostimplemented/jazz-pianist-style">Code</a>
     <a href="https://github.com/almostimplemented/PiJAMA">PiJAMA dataset</a>
   </div>
@@ -130,6 +177,47 @@
   <p class="status" id="status">Loading&hellip;</p>
 </section>
 
+
+<section id="scored">
+  <h2>Twelve continuations, scored</h2>
+  <p class="lede">
+    A shared prompt makes for a clean comparison, but it also pulls every
+    pianist toward the same tune. Here each pianist instead continues one of
+    <em>their own</em> held-out performances &mdash; the protocol the paper
+    evaluates. Alongside each take is what the classifier heard: a 1024-token
+    window slides along the continuation, and we count how often it names the
+    intended pianist. Each pianist gets two takes: a strong one, and a weaker
+    one, because the model does not sound equally like itself every time.
+  </p>
+
+  <div class="showcase">
+    <div class="sc-list" id="cont-list" role="group" aria-label="Choose a continuation"></div>
+    <div class="sc-main">
+      <div class="sc-head">
+        <div class="sc-label" id="cont-label"></div>
+        <div class="sc-score" id="cont-score"></div>
+      </div>
+      <div class="sc-strip" id="cont-strip" aria-label="Classifier verdict per window"></div>
+      <div class="sc-legend">
+        <span><i class="sw hit"></i> classifier names the intended pianist</span>
+        <span><i class="sw miss"></i> names someone else</span>
+        <span class="right">opacity = confidence</span>
+      </div>
+      <div class="transport">
+        <button class="play" id="cont-play" aria-label="Play">&#9654;</button>
+        <span class="time" id="cont-time">0:00 / 0:00</span>
+        <button class="ghost" id="blind-toggle" aria-pressed="false">showing: labelled</button>
+      </div>
+      <div id="guess-panel" hidden>
+        <p class="hint">Blindfold test: who is playing?</p>
+        <div class="guess" id="guess-buttons"></div>
+      </div>
+      <div id="reveal"></div>
+      <p class="status" id="cont-status"></p>
+    </div>
+  </div>
+</section>
+
 <section>
   <h2>What you are hearing</h2>
   <p>
@@ -162,5 +250,6 @@
 
 <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
 <script src="app.js"></script>
+<script src="showcase.js"></script>
 </body>
 </html>
