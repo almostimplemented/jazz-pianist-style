@@ -101,6 +101,12 @@ Released on the Hugging Face Hub (see the demo page for links): the
 conditioned generator, the PiJAMA-12 classifier used as the evaluation
 instrument, and the classifier trained only on generated music.
 
+## License
+
+Apache-2.0, matching [Aria](https://github.com/EleutherAI/aria), which this
+work builds on. The released checkpoints carry the same license.
+`llama_pijama/external/cheston_dpi/` remains under its original MIT license.
+
 ## Credits
 
 Built on [Aria](https://github.com/EleutherAI/aria) (Apache-2.0) and the

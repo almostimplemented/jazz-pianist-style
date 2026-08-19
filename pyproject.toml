@@ -5,6 +5,8 @@ description = "Learning Jazz Pianist Style with Cross-Attention Conditioning (IS
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Drew Edwards" }]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
     "torch>=2.0.0",
     "numpy>=1.26.0",
