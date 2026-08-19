@@ -4,19 +4,155 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Learning Jazz Pianist Style with Cross-Attention Conditioning</title>
+<meta name="description" content="Companion page for the ISMIR 2026 paper: listen to one prompt continued in the style of twelve jazz pianists, and swap between them as it plays.">
+<link rel="preconnect" href="https://tonejs.github.io">
 <style>
-  body { font-family: Georgia, serif; max-width: 42rem; margin: 4rem auto; padding: 0 1rem; color: #222; }
-  h1 { font-size: 1.6rem; line-height: 1.3; }
-  .authors { color: #555; margin-bottom: 2rem; }
-  .note { background: #f6f3ec; border-left: 3px solid #b89b5e; padding: 1rem; }
+  :root {
+    --bg: #12100e;
+    --bg-raised: #1b1815;
+    --line: #2e2823;
+    --ink: #f2ece3;
+    --ink-dim: #a89e91;
+    --accent: #e0a33e;
+    --accent-dim: #8a6524;
+    --prompt: #6f8fa8;
+    --radius: 10px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: Georgia, "Iowan Old Style", serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 60rem; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+  header { margin-bottom: 2.5rem; }
+  h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); line-height: 1.2; margin: 0 0 .6rem; }
+  .authors { color: var(--ink-dim); margin: 0 0 .25rem; }
+  .venue { color: var(--ink-dim); font-size: .95rem; margin: 0; }
+  .links { margin-top: 1.1rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+  .links a {
+    display: inline-block; padding: .4rem .85rem; border: 1px solid var(--line);
+    border-radius: 999px; color: var(--ink); text-decoration: none;
+    font-family: var(--mono); font-size: .8rem; letter-spacing: .02em;
+    transition: border-color .15s, color .15s;
+  }
+  .links a:hover { border-color: var(--accent); color: var(--accent); }
+  h2 { font-size: 1.3rem; margin: 3rem 0 .5rem; }
+  .lede { color: var(--ink-dim); margin: 0 0 1.5rem; }
+  .player {
+    background: var(--bg-raised); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem;
+  }
+  canvas { width: 100%; height: 260px; display: block; border-radius: 6px; background: #0d0b09; }
+  .transport { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+  button.play {
+    background: var(--accent); color: #17130c; border: 0; border-radius: 999px;
+    width: 3rem; height: 3rem; font-size: 1.1rem; cursor: pointer; flex: none;
+    display: grid; place-items: center; transition: transform .1s, background .15s;
+  }
+  button.play:hover { background: #f0b95a; }
+  button.play:active { transform: scale(.94); }
+  button.ghost {
+    background: none; color: var(--ink-dim); border: 1px solid var(--line);
+    border-radius: 999px; padding: .35rem .8rem; cursor: pointer;
+    font-family: var(--mono); font-size: .75rem;
+  }
+  button.ghost:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .scrub { flex: 1 1 12rem; display: flex; align-items: center; gap: .6rem; min-width: 10rem; }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  .time { font-family: var(--mono); font-size: .8rem; color: var(--ink-dim); min-width: 5.5rem; }
+  .now-playing { font-family: var(--mono); font-size: .8rem; color: var(--ink-dim); }
+  .now-playing b { color: var(--accent); font-weight: normal; }
+  .artists { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: .5rem; }
+  .artists button {
+    background: var(--bg-raised); color: var(--ink-dim); border: 1px solid var(--line);
+    border-radius: 8px; padding: .6rem .7rem; cursor: pointer; text-align: left;
+    font-family: inherit; font-size: .92rem; transition: all .15s;
+  }
+  .artists button:hover { border-color: var(--accent-dim); color: var(--ink); }
+  .artists button[aria-pressed="true"] {
+    border-color: var(--accent); color: var(--accent); background: #221a0d;
+  }
+  .hint { color: var(--ink-dim); font-size: .9rem; margin: .75rem 0 0; }
+  .status { font-family: var(--mono); font-size: .8rem; color: var(--ink-dim); min-height: 1.2em; }
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
+           color: var(--ink-dim); font-size: .9rem; }
+  code { font-family: var(--mono); font-size: .85em; color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
-<h1>Learning Jazz Pianist Style with Cross-Attention Conditioning</h1>
-<p class="authors">Drew Edwards, Akira Maezawa, Simon Dixon<br>
-ISMIR 2026</p>
-<p class="note">Companion page under construction &mdash; listening examples,
-generated MIDI, and characteristic-region excerpts will appear here for the
-conference. </p>
+<div class="wrap">
+<header>
+  <h1>Learning Jazz Pianist Style with Cross-Attention Conditioning</h1>
+  <p class="authors">Drew Edwards &middot; Akira Maezawa &middot; Simon Dixon</p>
+  <p class="venue">ISMIR 2026, Abu Dhabi</p>
+  <div class="links">
+    <a href="#demo">Listen</a>
+    <a href="https://github.com/almostimplemented/jazz-pianist-style">Code</a>
+    <a href="https://github.com/almostimplemented/PiJAMA">PiJAMA dataset</a>
+  </div>
+</header>
+
+<section id="demo">
+  <h2>One prompt, twelve pianists</h2>
+  <p class="lede">
+    The first few bars are a human performance of &ldquo;Ain&rsquo;t Misbehavin&rsquo;&rdquo;.
+    Everything after the marked branch point is generated, conditioned on one of
+    twelve jazz pianists. Because every continuation grows from the same prompt,
+    you can change pianist <em>while it plays</em> and hear the style hand over.
+  </p>
+
+  <div class="player">
+    <canvas id="roll" aria-label="Piano roll of the performance"></canvas>
+    <div class="transport">
+      <button class="play" id="play" aria-label="Play">&#9654;</button>
+      <div class="scrub">
+        <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek">
+        <span class="time" id="time">0:00 / 0:00</span>
+      </div>
+      <button class="ghost" id="restart">restart</button>
+      <span class="now-playing">in the style of <b id="current">&mdash;</b></span>
+    </div>
+  </div>
+
+  <div class="artists" id="artists" role="group" aria-label="Choose a pianist"></div>
+  <p class="hint">Switching mid-performance keeps the clock running &mdash; the music continues from where you are, in the new pianist&rsquo;s style.</p>
+  <p class="status" id="status">Loading&hellip;</p>
+</section>
+
+<section>
+  <h2>What you are hearing</h2>
+  <p>
+    A pretrained symbolic music transformer is fine-tuned with a gated
+    cross-attention adapter that reads a learned embedding for each pianist.
+    Unlike a prompt prefix, whose influence fades as generation continues, this
+    channel stays available at every step, so the conditioning persists through
+    long continuations.
+  </p>
+  <p>
+    We measure that with a classifier trained to identify the twelve pianists
+    (95.8&#8202;% per chunk, 98.8&#8202;% per track). Sliding it along generated
+    music, conditioned continuations are attributed to the intended pianist far
+    more often than unconditioned ones. A second classifier trained
+    <em>only</em> on generated performances then identifies real recordings with
+    95&#8202;% song-level accuracy &mdash; the generated music carries stylistic
+    structure that transfers back to human playing.
+  </p>
+</section>
+
+<footer>
+  <p>
+    Built on <a href="https://github.com/EleutherAI/aria" style="color:var(--accent)">Aria</a>
+    and the <a href="https://github.com/almostimplemented/PiJAMA" style="color:var(--accent)">PiJAMA</a>
+    dataset. Research tool for studying pianist style, not a system for imitation
+    at anyone&rsquo;s expense &mdash; see the paper&rsquo;s ethics discussion.
+  </p>
+</footer>
+</div>
+
+<script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
