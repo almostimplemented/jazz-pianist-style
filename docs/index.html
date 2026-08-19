@@ -97,14 +97,17 @@
                                          background: #221a0d; }
   .sc-list .idx { font-family: var(--mono); font-size: .7rem; opacity: .6; }
   .sc-list .ag { font-family: var(--mono); font-size: .72rem; opacity: .75; }
-  .sc-list .take { font-family: var(--mono); font-size: .62rem; color: var(--prompt); }
+  .sc-takes { display: flex; gap: .35rem; margin-top: .55rem; }
+  .sc-takes button { background: none; border: 1px solid var(--line); color: var(--ink-dim);
+                     border-radius: 999px; padding: .22rem .65rem; cursor: pointer;
+                     font-family: var(--mono); font-size: .7rem; }
+  .sc-takes button:hover { border-color: var(--accent-dim); color: var(--ink); }
+  .sc-takes button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
   .sc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
              flex-wrap: wrap; margin-bottom: .8rem; }
   .sc-label b { font-size: 1.1rem; }
   .sc-label .sub { display: block; color: var(--ink-dim); font-size: .85rem; margin-top: .15rem; }
   .sc-label .masked { color: var(--ink-dim); font-style: italic; }
-  .sc-label .tag { font-family: var(--mono); font-size: .68rem; color: var(--prompt);
-                   border: 1px solid var(--line); border-radius: 999px; padding: .1rem .45rem; }
   .sc-score { text-align: right; }
   .sc-score .big { display: block; font-size: 1.6rem; color: var(--accent); line-height: 1.1; }
   .sc-score .cap { font-family: var(--mono); font-size: .65rem; color: var(--ink-dim); }
@@ -186,15 +189,18 @@
     <em>their own</em> held-out performances &mdash; the protocol the paper
     evaluates. Alongside each take is what the classifier heard: a 1024-token
     window slides along the continuation, and we count how often it names the
-    intended pianist. Each pianist gets two takes: a strong one, and a weaker
-    one, because the model does not sound equally like itself every time.
+    intended pianist. Two takes per pianist, each shown with the score the
+    classifier gave it.
   </p>
 
   <div class="showcase">
     <div class="sc-list" id="cont-list" role="group" aria-label="Choose a continuation"></div>
     <div class="sc-main">
       <div class="sc-head">
-        <div class="sc-label" id="cont-label"></div>
+        <div>
+          <div class="sc-label" id="cont-label"></div>
+          <div class="sc-takes" id="cont-takes" role="group" aria-label="Choose a take"></div>
+        </div>
         <div class="sc-score" id="cont-score"></div>
       </div>
       <div class="sc-strip" id="cont-strip" aria-label="Classifier verdict per window"></div>

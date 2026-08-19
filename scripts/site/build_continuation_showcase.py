@@ -7,10 +7,8 @@ persistence: a 1024-token classification window slides along the
 continuation at stride 128, and we record which pianist the classifier hears
 in each window.
 
-Several candidates per pianist are scored and one is kept, chosen by
---select: the strongest example (default, for demonstration) or the one
-nearest that pianist's median (for a representative picture). Whichever is
-kept carries its own true score, so nothing is overstated.
+Several candidates per pianist are scored; the two highest-scoring distinct
+samples are kept, each carrying the score the classifier gave it.
 
 Output is a single JSON holding, per pianist: the generated notes, the
 per-window classifier verdicts, the overall agreement, and the source track
@@ -63,12 +61,11 @@ def parse_args():
                          "--select does not re-run the classifier")
     ap.add_argument("--candidates-per-artist", type=int, default=8,
                     help="how many generations to score per pianist")
-    ap.add_argument("--select", choices=["best", "median", "pair"], default="pair",
-                    help="keep the strongest candidate, the median one, or a pair: "
-                         "the strongest plus a weaker take of the same pianist")
-    ap.add_argument("--weaker-below", type=float, default=0.9,
-                    help="in pair mode, the weaker take is the best candidate "
-                         "scoring below this")
+    ap.add_argument("--takes-per-artist", type=int, default=2,
+                    help="how many of the top-scoring candidates to keep")
+    ap.add_argument("--min-windows", type=int, default=5,
+                    help="a take must span at least this many classification "
+                         "windows (rules out early-EOS stubs)")
     ap.add_argument("--max-tokens", type=int, default=4096)
     ap.add_argument("--artists", nargs="*", default=None, help="default: all")
     ap.add_argument("--seed", type=int, default=42)
@@ -184,31 +181,29 @@ def main():
                              for c in candidates]
         if not candidates:
             continue
-        candidates.sort(key=lambda c: c[0])
-        if args.select == "median":
-            keep = [candidates[len(candidates) // 2]]
-        elif args.select == "best":
-            keep = [candidates[-1]]
-        else:  # pair: the strongest, plus a genuinely different weaker take
-            best = candidates[-1]
-            pool = [c for c in candidates[:-1] if c[0] < args.weaker_below]
-            weaker = pool[-1] if pool else (candidates[0] if len(candidates) > 1 else None)
-            keep = [best] + ([weaker] if weaker is not None else [])
+        # Early-EOS stubs are not demo material: a take must be long enough
+        # to carry a meaningful score. Ties on agreement break toward the
+        # take with more windows behind it.
+        eligible = [c for c in candidates if len(c[4]) >= args.min_windows]
+        dropped = len(candidates) - len(eligible)
+        if dropped:
+            logger.info(f"  {artist}: dropped {dropped} short candidate(s)")
+        eligible.sort(key=lambda c: (-c[0], -len(c[4])))
+        keep = eligible[:args.takes_per_artist]
 
-        for rank, (agreement, idx, rec, ids, windows) in enumerate(keep):
+        takes = []
+        for agreement, idx, rec, ids, windows in keep:
             notes, duration = notes_from_ids(ids, tokenizer)
             src = provenance.get(str(rec.get("sample_idx", idx)), {})
-            items.append({
-                "artist": artist, "mode": "conditioned",
-                "take": "strong" if rank == 0 else "weaker",
+            takes.append({
                 "sample_idx": rec.get("sample_idx", idx),
-                "prompt_title": Path(src.get("track_id", "")).stem, "prompt_album": "",
-                "prompt_notes": [], "notes": notes,
-                "branch_ms": 0, "duration_ms": duration,
+                "prompt_title": Path(src.get("track_id", "")).stem,
+                "notes": notes, "duration_ms": duration,
                 "agreement": agreement, "windows": windows,
                 "generated_tokens": len(ids),
             })
-        logger.info(f"{artist}: kept {[f'{k[0]:.0%}' for k in keep]} "
+        items.append({"artist": artist, "takes": takes})
+        logger.info(f"{artist}: kept {[f'{t[0]:.0%}' for t in keep]} "
                     f"(candidates {sorted(round(c[0], 2) for c in candidates)})")
 
     if args.score_cache:
@@ -219,7 +214,7 @@ def main():
         "config": {"source": str(args.generations),
                    "classify_window": CLASSIFY_WINDOW, "window_stride": WINDOW_STRIDE,
                    "candidates_per_artist": args.candidates_per_artist,
-                   "selection": args.select, "seed": args.seed},
+                   "selection": "top scoring distinct samples", "seed": args.seed},
         "note_format": ["start_ms", "duration_ms", "pitch", "velocity"],
         "items": items,
     }, separators=(",", ":")))
