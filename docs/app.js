@@ -155,87 +155,24 @@
 
   /* ---------- drawing ---------- */
 
-  function resize() {
-    const dpr = window.devicePixelRatio || 1;
-    const w = el.canvas.clientWidth, h = el.canvas.clientHeight;
-    el.canvas.width = Math.round(w * dpr);
-    el.canvas.height = Math.round(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
+  const roll = makeRoll(el.canvas);
+
+  function resize() { roll.resize(); }
 
   function draw() {
     if (!data) return;
-    const w = el.canvas.clientWidth, h = el.canvas.clientHeight;
-    const cur = nowMs();
-    const from = cur - WINDOW_MS * PLAYHEAD_FRAC;
-    const to = from + WINDOW_MS;
-    const notes = data.artists[active].notes;
-
-    ctx.clearRect(0, 0, w, h);
-
-    // pitch range: fixed piano span keeps the view stable while swapping
-    const LO = 21, HI = 108;
-    const yOf = (p) => h - ((p - LO) / (HI - LO)) * (h - 8) - 4;
-    const xOf = (ms) => ((ms - from) / WINDOW_MS) * w;
-
-    // octave guides
-    ctx.strokeStyle = COLOR.line;
-    ctx.lineWidth = 1;
-    for (let p = 24; p <= HI; p += 12) {
-      const y = Math.round(yOf(p)) + 0.5;
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-    }
-
-    // branch marker: where the human prompt ends and generation begins
-    const bx = xOf(data.branch_ms);
-    if (bx > -20 && bx < w + 20) {
-      ctx.save();
-      ctx.strokeStyle = COLOR.dim;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx, h); ctx.stroke();
-      ctx.restore();
-      ctx.fillStyle = COLOR.dim;
-      ctx.font = "11px ui-monospace, monospace";
-      ctx.fillText("model takes over", bx + 6, 14);
-    }
-
-    // notes of the selected take
-    const noteH = Math.max(2.5, (h - 8) / (HI - LO) * 1.6);
-    {
-      const notes = data.artists[active].notes;
-      for (let i = 0; i < notes.length; i += 4) {
-      const start = notes[i], dur = notes[i + 1], pitch = notes[i + 2], vel = notes[i + 3];
-      if (start + dur < from) continue;
-      if (start > to) break;
-      const x = xOf(start), wpx = Math.max(2, (dur / WINDOW_MS) * w);
-      const y = yOf(pitch);
-      const isPrompt = start < data.branch_ms;
-      const played = start <= cur;
-      ctx.globalAlpha = played ? 1 : 0.42;
-      ctx.fillStyle = isPrompt ? COLOR.prompt : COLOR.gen;
-      ctx.beginPath();
-      if (ctx.roundRect) {
-        ctx.roundRect(x, y - noteH / 2, wpx, noteH, Math.min(2, noteH / 2));
-      } else {  // older Safari
-        ctx.rect(x, y - noteH / 2, wpx, noteH);
-      }
-      ctx.fill();
-      // velocity as a subtle brightness cue on the played side
-      if (played && vel > 90) {
-        ctx.globalAlpha = 0.25;
-        ctx.fillStyle = "#fff";
-        ctx.fill();
-      }
-      }
-    }
-    ctx.globalAlpha = 1;
-
-    // playhead
-    const px = Math.round(w * PLAYHEAD_FRAC) + 0.5;
-    ctx.strokeStyle = "#fff";
-    ctx.globalAlpha = 0.8;
-    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
-    ctx.globalAlpha = 1;
+    const a = data.artists[active];
+    roll.draw({
+      streams: [
+        { notes: a.notes.slice(0, 4 * data.shared_notes), color: COLOR.prompt },
+        { notes: a.notes.slice(4 * data.shared_notes), color: COLOR.gen },
+      ],
+      nowMs: nowMs(),
+      windowMs: WINDOW_MS,
+      playheadFrac: PLAYHEAD_FRAC,
+      branchMs: data.branch_ms,
+      branchLabel: "model takes over",
+    });
   }
 
   function frame() {

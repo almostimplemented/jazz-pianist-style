@@ -37,7 +37,7 @@ import torch
 from ariautils.tokenizer import AbsTokenizer
 
 from llama_pijama.evaluation import load_model as load_classifier
-from llama_pijama.utils.generation import ids_to_tokens
+from llama_pijama.utils.generation import ids_to_tokens, tokens_to_ids
 
 logger = logging.getLogger("showcase")
 
@@ -53,6 +53,11 @@ def parse_args():
                     help="JSONL of generated_ids + artist")
     ap.add_argument("--provenance", type=Path, default=None,
                     help="JSON mapping sample index -> source track")
+    ap.add_argument("--train-jsonl", type=Path, default=None,
+                    help="the sequences the generations were prompted from; "
+                         "when given, each take includes its actual prompt")
+    ap.add_argument("--prompt-length", type=int, default=256,
+                    help="prompt tokens used at generation time")
     ap.add_argument("--classifier", type=Path, required=True)
     ap.add_argument("--artist-map", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
@@ -137,6 +142,29 @@ def main():
     eos_id = tokenizer.vocab.index(tokenizer.eos_tok)
     provenance = json.loads(args.provenance.read_text()) if args.provenance else {}
 
+    # Recover each sample's exact prompt. The generation job walked the train
+    # set in order, skipping some records; provenance keeps that order, so an
+    # order-preserving match on track_id recovers the source record uniquely.
+    prompt_of = {}
+    if args.train_jsonl and provenance:
+        train = []
+        with jsonlines.open(args.train_jsonl) as reader:
+            for rec in reader:
+                m = rec["metadata"]
+                train.append((m.get("track_id") or m.get("midi_filepath"), rec["seq"]))
+        ti = 0
+        for k in sorted(provenance, key=int):
+            want = provenance[k]["track_id"]
+            j = ti
+            while j < len(train) and train[j][0] != want:
+                j += 1
+            if j == len(train):
+                logger.warning(f"no prompt source found for sample {k}")
+                continue
+            prompt_of[int(k)] = train[j][1]
+            ti = j + 1
+        logger.info(f"recovered prompt sources for {len(prompt_of)}/{len(provenance)} samples")
+
     by_artist = defaultdict(list)
     with jsonlines.open(args.generations) as reader:
         for i, rec in enumerate(reader):
@@ -193,11 +221,28 @@ def main():
 
         takes = []
         for agreement, idx, rec, ids, windows in keep:
-            notes, duration = notes_from_ids(ids, tokenizer)
-            src = provenance.get(str(rec.get("sample_idx", idx)), {})
+            sample_idx = rec.get("sample_idx", idx)
+            src = provenance.get(str(sample_idx), {})
+            prompt_notes, branch = [], 0
+            seq = prompt_of.get(sample_idx)
+            if seq is not None:
+                prompt_ids = tokens_to_ids(seq, tokenizer)[:args.prompt_length]
+                # decode prompt and prompt+continuation as one stream so the
+                # join keeps continuous timing, then split at the branch
+                _, branch = notes_from_ids(prompt_ids, tokenizer)
+                combined, _ = notes_from_ids(prompt_ids + list(ids), tokenizer)
+                prompt_notes, notes = [], []
+                for i in range(0, len(combined), 4):
+                    (prompt_notes if combined[i] < branch else notes).extend(combined[i:i+4])
+                duration = branch
+                if notes:
+                    duration = max(notes[i] + notes[i+1] for i in range(0, len(notes), 4))
+            else:
+                notes, duration = notes_from_ids(ids, tokenizer)
             takes.append({
-                "sample_idx": rec.get("sample_idx", idx),
+                "sample_idx": sample_idx,
                 "prompt_title": Path(src.get("track_id", "")).stem,
+                "prompt_notes": prompt_notes, "branch_ms": branch,
                 "notes": notes, "duration_ms": duration,
                 "agreement": agreement, "windows": windows,
                 "generated_tokens": len(ids),

@@ -15,6 +15,8 @@
   const nodes = {
     list: el("cont-list"),
     play: el("cont-play"),
+    seek: el("cont-seek"),
+    canvas: el("cont-roll"),
     time: el("cont-time"),
     label: el("cont-label"),
     takes: el("cont-takes"),
@@ -27,6 +29,12 @@
     status: el("cont-status"),
   };
 
+  const css = getComputedStyle(document.documentElement);
+  const COLOR = {
+    prompt: css.getPropertyValue("--prompt").trim() || "#6f8fa8",
+    gen: css.getPropertyValue("--accent").trim() || "#e0a33e",
+  };
+  let roll = null;
   let items = [], active = 0, takeIdx = 0, blind = false, guessed = null;
   let sampler = null, playing = false, startedAt = 0, offsetMs = 0, scheduledMs = 0;
 
@@ -64,17 +72,19 @@
     const cur = nowMs();
     const until = cur + (document.hidden ? LOOKAHEAD_HIDDEN_MS : LOOKAHEAD_VISIBLE_MS);
     const t0 = Tone.now();
-    const notes = take().notes;
-    for (let i = 0; i < notes.length; i += 4) {
-      const start = notes[i];
-      if (start < scheduledMs) continue;
-      if (start >= until) break;
-      try {
-        sampler.triggerAttackRelease(midiToNote(notes[i + 2]),
-          Math.max(0.05, notes[i + 1] / 1000),
-          t0 + Math.max(0, (start - cur) / 1000),
-          clamp(notes[i + 3] / 127, 0.05, 1));
-      } catch (e) { /* out-of-range note */ }
+    const t = take();
+    for (const notes of [t.prompt_notes, t.notes]) {
+      for (let i = 0; i < notes.length; i += 4) {
+        const start = notes[i];
+        if (start < scheduledMs) continue;
+        if (start >= until) break;
+        try {
+          sampler.triggerAttackRelease(midiToNote(notes[i + 2]),
+            Math.max(0.05, notes[i + 1] / 1000),
+            t0 + Math.max(0, (start - cur) / 1000),
+            clamp(notes[i + 3] / 127, 0.05, 1));
+        } catch (e) { /* out-of-range note */ }
+      }
     }
     scheduledMs = Math.max(scheduledMs, until);
     if (cur >= take().duration_ms) stopPlayback(true);
@@ -104,6 +114,7 @@
     nodes.reveal.innerHTML = "";
     [...nodes.list.children].forEach((b, i) =>
       b.setAttribute("aria-pressed", String(i === idx)));
+    nodes.seek.max = String(take().duration_ms);
     render();
   }
 
@@ -176,7 +187,15 @@
     });
   }
 
+  function seekTo(ms) {
+    const was = playing;
+    if (was) stopPlayback();
+    offsetMs = clamp(ms, 0, take().duration_ms);
+    if (was) startPlayback();
+  }
+
   nodes.play.addEventListener("click", () => (playing ? stopPlayback() : startPlayback()));
+  nodes.seek.addEventListener("input", (e) => seekTo(Number(e.target.value)));
   nodes.blind.addEventListener("click", () => {
     blind = !blind;
     nodes.blind.setAttribute("aria-pressed", String(blind));
@@ -200,11 +219,26 @@
         g.addEventListener("click", () => makeGuess(n));
         nodes.guessBtns.appendChild(g);
       }
+      roll = makeRoll(nodes.canvas);
       select(0);
       setInterval(pump, 50);
       (function frame() {
-        if (items.length) nodes.time.textContent =
-          `${fmt(nowMs())} / ${fmt(take().duration_ms)}`;
+        if (items.length) {
+          const t = take();
+          const cur = nowMs();
+          nodes.time.textContent = `${fmt(cur)} / ${fmt(t.duration_ms)}`;
+          if (document.activeElement !== nodes.seek)
+            nodes.seek.value = String(Math.round(cur));
+          roll.draw({
+            streams: [
+              { notes: t.prompt_notes, color: COLOR.prompt },
+              { notes: t.notes, color: COLOR.gen },
+            ],
+            nowMs: cur,
+            branchMs: t.branch_ms,
+            branchLabel: blind && guessed === null ? "model takes over" : "model takes over",
+          });
+        }
         requestAnimationFrame(frame);
       })();
     })
