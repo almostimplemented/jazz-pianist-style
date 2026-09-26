@@ -180,7 +180,7 @@
     }
   });
 
-  fetch(DATA_URL)
+  fetch(DATA_URL, { cache: "no-cache" })
     .then((r) => r.json())
     .then((payload) => {
       data = payload;

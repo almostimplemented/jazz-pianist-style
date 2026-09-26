@@ -21,25 +21,18 @@ import numpy as np
 import pretty_midi
 
 
-LEAD_MS = 250  # excerpts start mid-performance; start each one promptly
-
-
 def pack_notes(path: Path):
+    """Flat [start_ms, dur_ms, pitch, velocity] list, timed from the excerpt start."""
     if not path.exists():
         return [], 0
     pm = pretty_midi.PrettyMIDI(str(path))
     notes = sorted((n for inst in pm.instruments for n in inst.notes),
                    key=lambda x: (x.start, x.pitch))
-    if not notes:
-        return [], 0
-    shift = notes[0].start * 1000 - LEAD_MS
-    flat, end = [], 0
+    flat = []
     for n in notes:
-        start = int(round(n.start * 1000 - shift))
-        dur = int(round((n.end - n.start) * 1000))
-        flat += [start, dur, int(n.pitch), int(n.velocity)]
-        end = max(end, start + dur)
-    return flat, end
+        flat += [int(round(n.start * 1000)), int(round((n.end - n.start) * 1000)),
+                 int(n.pitch), int(n.velocity)]
+    return flat
 
 
 def parse_args():
@@ -67,26 +60,27 @@ def main():
             continue
         z = np.load(curve_path)
         smoothed = z["smoothed"].astype(float)
-        positions = z["positions"].astype(int)
+        times = z["times"].astype(float)
         if len(smoothed) > args.max_curve_points:
             idx = np.linspace(0, len(smoothed) - 1, args.max_curve_points).astype(int)
-            smoothed, positions = smoothed[idx], positions[idx]
+            smoothed, times = smoothed[idx], times[idx]
 
         entry = {
             "artist": t["artist"], "title": t["title"],
             "peak_z": round(t["peak_smoothed_z"], 2),
             "trough_z": round(t["trough_smoothed_z"], 2),
-            "peak_position": t["peak_position"], "trough_position": t["trough_position"],
-            "n_tokens": t["n_tokens"],
-            "positions": positions.tolist(),
+            "peak_time_s": round(t["peak_time_s"], 2),
+            "trough_time_s": round(t["trough_time_s"], 2),
+            "duration_s": round(t["duration_s"], 2),
+            "times": [round(v, 2) for v in times],
             "curve": [round(v, 3) for v in smoothed],
         }
         for label in ("peak", "trough"):
             key = f"{label}_excerpt"
             if key in t:
-                notes, dur = pack_notes(args.regions_dir / t[key])
-                entry[f"{label}_notes"] = notes
-                entry[f"{label}_duration_ms"] = dur
+                entry[f"{label}_notes"] = pack_notes(args.regions_dir / t[key])
+                entry[f"{label}_start_s"] = round(t[f"{label}_excerpt_start_s"], 2)
+                entry[f"{label}_duration_ms"] = int(summary["config"].get("excerpt_seconds", 15.0) * 1000)
         if "peak_notes" in entry and "trough_notes" in entry:
             tracks.append(entry)
 

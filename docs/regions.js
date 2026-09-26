@@ -51,16 +51,42 @@
     cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
+  const fmt = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+  const EXCERPT_S = () => (track().peak_duration_ms || 15000) / 1000;
+
+  // z at a moment of the performance, interpolated between window centres
+  function zAt(t, sec) {
+    const ts = t.times;
+    if (sec <= ts[0]) return t.curve[0];
+    for (let i = 1; i < ts.length; i++) {
+      if (sec <= ts[i]) {
+        const f = (sec - ts[i - 1]) / Math.max(1e-6, ts[i] - ts[i - 1]);
+        return t.curve[i - 1] + f * (t.curve[i] - t.curve[i - 1]);
+      }
+    }
+    return t.curve[t.curve.length - 1];
+  }
+
   function drawCurve() {
     const t = track();
     const w = nodes.curve.clientWidth, h = nodes.curve.clientHeight;
-    const padT = 18, padB = 18;
+    const padT = 18, padB = 20;
     const zMax = Math.max(2.2, ...t.curve.map(Math.abs)) + 0.2;
     const yOf = (z) => padT + (1 - (clamp(z, -zMax, zMax) + zMax) / (2 * zMax)) * (h - padT - padB);
-    const last = t.positions[t.positions.length - 1] || 1;
-    const xOf = (pos) => (pos / last) * (w - 2) + 1;
+    const span = Math.max(1, t.duration_s);
+    const xOf = (sec) => (sec / span) * (w - 2) + 1;
 
     cctx.clearRect(0, 0, w, h);
+
+    // the two excerpt regions, shaded as in the paper's figure
+    for (const c of clips) {
+      const x0 = xOf(t[`${c.which}_start_s`]), x1 = xOf(t[`${c.which}_start_s`] + EXCERPT_S());
+      cctx.globalAlpha = playingClip === c ? 0.22 : 0.1;
+      cctx.fillStyle = c.which === "peak" ? COLOR.peak : COLOR.trough;
+      cctx.fillRect(x0, 0, x1 - x0, h - padB + 4);
+    }
+    cctx.globalAlpha = 1;
+
     cctx.strokeStyle = COLOR.line;
     cctx.lineWidth = 1;
     for (const z of [-2, -1, 1, 2]) {
@@ -73,12 +99,13 @@
     cctx.beginPath(); cctx.moveTo(0, y0); cctx.lineTo(w, y0); cctx.stroke();
 
     // fill above zero in gold, below in mauve
+    const first = t.times[0], last = t.times[t.times.length - 1];
     for (const [sign, color] of [[1, COLOR.peak], [-1, COLOR.trough]]) {
       cctx.beginPath();
-      cctx.moveTo(xOf(t.positions[0]), y0);
-      t.positions.forEach((p, i) => {
+      cctx.moveTo(xOf(first), y0);
+      t.times.forEach((sec, i) => {
         const z = t.curve[i];
-        cctx.lineTo(xOf(p), sign * z > 0 ? yOf(z) : y0);
+        cctx.lineTo(xOf(sec), sign * z > 0 ? yOf(z) : y0);
       });
       cctx.lineTo(xOf(last), y0);
       cctx.closePath();
@@ -89,33 +116,43 @@
     cctx.globalAlpha = 1;
     cctx.strokeStyle = COLOR.dim;
     cctx.beginPath();
-    t.positions.forEach((p, i) => {
-      const x = xOf(p), y = yOf(t.curve[i]);
+    t.times.forEach((sec, i) => {
+      const x = xOf(sec), y = yOf(t.curve[i]);
       i ? cctx.lineTo(x, y) : cctx.moveTo(x, y);
     });
     cctx.stroke();
 
     cctx.font = "11px ui-monospace, monospace";
     for (const c of clips) {
-      const pos = t[`${c.which}_position`], z = t[`${c.which}_z`];
-      const x = xOf(pos), y = yOf(z);
-      const lit = playingClip === c;
+      const x = xOf(t[`${c.which}_time_s`]), y = yOf(t[`${c.which}_z`]);
       cctx.fillStyle = c.which === "peak" ? COLOR.peak : COLOR.trough;
-      cctx.beginPath(); cctx.arc(x, y, lit ? 6 : 4.5, 0, Math.PI * 2); cctx.fill();
-      if (lit) {
-        cctx.strokeStyle = "#fff"; cctx.lineWidth = 1.5;
-        cctx.stroke(); cctx.lineWidth = 1;
-      }
+      cctx.beginPath(); cctx.arc(x, y, 4.5, 0, Math.PI * 2); cctx.fill();
       const label = `${c.which === "peak" ? "most" : "least"} characteristic`;
       const tw = cctx.measureText(label).width;
       const lx = clamp(x - tw / 2, 2, w - tw - 2);
       cctx.fillStyle = COLOR.dim;
-      cctx.fillText(label, lx, c.which === "peak" ? Math.max(11, y - 10) : Math.min(h - 3, y + 18));
+      cctx.fillText(label, lx, c.which === "peak" ? Math.max(11, y - 10) : Math.min(h - padB - 2, y + 18));
     }
+
+    // time axis
     cctx.fillStyle = COLOR.dim;
-    cctx.fillText("start of performance", 2, h - 3);
-    const endLabel = "end";
-    cctx.fillText(endLabel, w - cctx.measureText(endLabel).width - 2, h - 3);
+    const step = span > 240 ? 60 : 30;
+    for (let sec = 0; sec <= span; sec += step) {
+      const label = fmt(sec), tw = cctx.measureText(label).width;
+      cctx.fillText(label, clamp(xOf(sec) - tw / 2, 1, w - tw - 1), h - 4);
+    }
+
+    // live playhead while an excerpt plays
+    if (playingClip) {
+      const sec = t[`${playingClip.which}_start_s`] + nowMs() / 1000;
+      const x = xOf(sec), y = yOf(zAt(t, sec));
+      cctx.strokeStyle = "#fff";
+      cctx.globalAlpha = 0.7;
+      cctx.beginPath(); cctx.moveTo(Math.round(x) + 0.5, 0); cctx.lineTo(Math.round(x) + 0.5, h - padB + 4); cctx.stroke();
+      cctx.globalAlpha = 1;
+      cctx.fillStyle = "#fff";
+      cctx.beginPath(); cctx.arc(x, y, 5, 0, Math.PI * 2); cctx.fill();
+    }
   }
 
   /* ---------- excerpts ---------- */
@@ -199,8 +236,9 @@
     nodes.title.innerHTML = `<b>${t.artist}</b><span class="sub">&ldquo;${t.title}&rdquo;</span>`;
     for (const c of clips) {
       const z = t[`${c.which}_z`];
+      const t0 = t[`${c.which}_start_s`];
       c.cap.innerHTML = `${c.which === "peak" ? "Most" : "Least"} characteristic` +
-        `<span class="z">z ${signed(z)}</span>`;
+        `<span class="z">${fmt(t0)}&ndash;${fmt(t0 + EXCERPT_S())} &middot; z ${signed(z)}</span>`;
     }
     nodes.note.textContent = t.peak_z < 0.8
       ? `No passage stands out as especially characteristic: the classifier recognizes ` +
@@ -218,7 +256,7 @@
   document.addEventListener("demo:play", (e) => { if (e.detail !== "regions") stop(); });
   window.addEventListener("resize", () => { if (tracks.length) { sizeCurve(); drawCurve(); drawClips(); } });
 
-  fetch(DATA_URL)
+  fetch(DATA_URL, { cache: "no-cache" })
     .then((r) => r.json())
     .then((payload) => {
       tracks = payload.tracks;
@@ -234,10 +272,10 @@
       select(Math.max(0, tracks.findIndex((t) => t.artist === "Art Tatum")));
       setInterval(pump, 50);
       (function frame() {
-        if (playingClip) drawClips();
+        if (playingClip) { drawClips(); drawCurve(); }
         requestAnimationFrame(frame);
       })();
-      let lastLit = null;
+      let lastLit = null;  // repaint once more when playback stops
       setInterval(() => { if (lastLit !== playingClip) { lastLit = playingClip; drawCurve(); } }, 100);
     })
     .catch((e) => console.error(e));  // the section stays hidden

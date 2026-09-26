@@ -221,7 +221,7 @@
     if (e.detail !== "showcase" && playing) stopPlayback();
   });
 
-  fetch(DATA_URL)
+  fetch(DATA_URL, { cache: "no-cache" })
     .then((r) => r.json())
     .then((payload) => {
       items = payload.items;
