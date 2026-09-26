@@ -78,6 +78,10 @@
     border-color: var(--accent); color: var(--accent); background: #221a0d;
   }
   .hint { color: var(--ink-dim); font-size: .9rem; margin: .75rem 0 0; }
+  .intro p { margin: 0 0 1rem; max-width: 42rem; }
+  .intro .pianists { color: var(--ink-dim); font-size: .92rem; }
+  .intro .note { color: var(--ink-dim); font-size: .88rem; border-left: 2px solid var(--line);
+                 padding-left: .9rem; }
   .status { font-family: var(--mono); font-size: .8rem; color: var(--ink-dim); min-height: 1.2em; }
   footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
            color: var(--ink-dim); font-size: .9rem; }
@@ -149,6 +153,45 @@
     <a href="https://github.com/almostimplemented/PiJAMA">PiJAMA dataset</a>
   </div>
 </header>
+
+<section class="intro">
+  <p>
+    Jazz listeners can often name a pianist within a few bars, and jazz
+    pianists learn by imitating the greats &mdash; Dick Hyman wrote a whole
+    book of etudes, each in the style of a different master. We asked whether
+    a music model can learn those styles too: not just recognize who is
+    playing, but play in their manner.
+  </p>
+  <p>
+    We start from Aria, a transformer pretrained on a large corpus of piano
+    MIDI, and fine-tune it on solo performances from the PiJAMA dataset with
+    one addition: a gated cross-attention layer that reads a learned
+    embedding for each pianist. A prompt prefix loses its grip as generation
+    goes on; this channel is available at every step, so the conditioning
+    holds through long continuations.
+  </p>
+  <p>
+    To measure style we trained a classifier to tell the twelve pianists apart
+    (98.8% of held-out songs). Slid along generated music, it names the
+    intended pianist 70% of the time, against 37% without conditioning. And a
+    second classifier trained <em>only</em> on the model&rsquo;s generations
+    identifies real recordings with 95% accuracy &mdash; the generated music
+    carries style that transfers back to human playing.
+  </p>
+  <p class="pianists">
+    The twelve: Art Tatum, Erroll Garner, Abdullah Ibrahim, Horace Parlan,
+    Tete Montoliu, Oscar Peterson, Hank Jones, Dick Hyman, Cedar Walton,
+    George Cables, Andy Laverne, and Dave McKenna.
+  </p>
+  <p class="note">
+    Everything here is MIDI, played in your browser on a sampled piano; the
+    training data are automatic transcriptions of recordings, so dynamics and
+    pedalling are approximate. The twelve were chosen because their styles
+    are the most separable of PiJAMA&rsquo;s thirty, and the model imitates
+    some far better than others: conditioned agreement ranges from 96%
+    (Hank Jones, Dick Hyman) to 29% (Cedar Walton).
+  </p>
+</section>
 
 <section id="demo">
   <h2>One prompt, twelve pianists</h2>
@@ -233,25 +276,6 @@
   </div>
 </section>
 
-<section>
-  <h2>What you are hearing</h2>
-  <p>
-    A pretrained symbolic music transformer is fine-tuned with a gated
-    cross-attention adapter that reads a learned embedding for each pianist.
-    Unlike a prompt prefix, whose influence fades as generation continues, this
-    channel stays available at every step, so the conditioning persists through
-    long continuations.
-  </p>
-  <p>
-    We measure that with a classifier trained to identify the twelve pianists
-    (95.8&#8202;% per chunk, 98.8&#8202;% per track). Sliding it along generated
-    music, conditioned continuations are attributed to the intended pianist far
-    more often than unconditioned ones. A second classifier trained
-    <em>only</em> on generated performances then identifies real recordings with
-    95&#8202;% song-level accuracy &mdash; the generated music carries stylistic
-    structure that transfers back to human playing.
-  </p>
-</section>
 
 <footer>
   <p>
