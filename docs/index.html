@@ -432,12 +432,17 @@
     </figcaption>
   </figure>
 
-  <h3>Why not just perplexity?</h3>
+  <h3>Measuring style</h3>
   <p>
-    The usual measure, perplexity on held-out music, barely notices the
-    conditioning: given the real preceding notes, the next note is predictable
-    whoever is playing. Style shows up when the model generates freely and has
-    to stay in character on its own output.
+    How can we tell whether the model has learned a pianist&rsquo;s style? The
+    standard yardstick for a generative model, perplexity on held-out music,
+    turns out to be nearly blind to it: given the real preceding notes, the
+    next one is predictable whoever is playing, so conditioning barely moves
+    the score. Style shows up when the model generates freely and has to stay
+    in character on its own output. So instead we let it play, and ask a
+    pianist classifier who it sounds like. <em>Agreement</em> is how often the
+    classifier names the intended pianist, in windows slid along each
+    continuation.
   </p>
   <table class="results">
     <thead><tr><th>Model</th><th>Perplexity</th><th>Agreement</th></tr></thead>
@@ -448,17 +453,17 @@
     </tbody>
   </table>
   <p class="hint">
-    Agreement: how often the pianist classifier names the intended pianist in
-    windows slid along 4096-token continuations of 256-token prompts.
+    Perplexity (lower is better) barely separates the two fine-tuned models;
+    agreement nearly doubles. Continuations are 4096 tokens from 256-token
+    prompts; chance agreement is 8%.
   </p>
 
-  <h3>Three ways to check the style</h3>
+  <h3>Three ways we use the classifier</h3>
   <ul class="evals">
     <li>
-      <b>Sliding-window agreement.</b> A classifier that identifies 98.8% of
-      held-out songs is slid along each continuation. Conditioned music is
-      attributed to the intended pianist 70% of the time against 37% without
-      conditioning, and the gap holds for the whole continuation. The strips
+      <b>Sliding-window agreement,</b> above. The classifier identifies 98.8%
+      of held-out songs, and the conditioned model&rsquo;s lead holds from the
+      start of a continuation to its end. The strips
       under the <a href="#scored">scored takes</a> are this measurement.
     </li>
     <li>
