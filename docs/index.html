@@ -187,9 +187,12 @@
   <h2>Twelve continuations, scored</h2>
   <p class="lede">
     A shared prompt makes for a clean comparison, but it also pulls every
-    pianist toward the same tune. Here each pianist instead continues one of
-    <em>their own</em> held-out performances &mdash; the protocol the paper
-    evaluates. Alongside each take is what the classifier heard: a 1024-token
+    pianist toward the same tune. Here each pianist instead continues a few
+    bars of <em>their own</em> playing. These takes come from the corpus of
+    generated music that the paper&rsquo;s synthetic-only classifier learned
+    from; the generations resemble their closest training performance less
+    than held-out real performances do, so the model is not replaying what it
+    heard. Alongside each take is what the classifier heard: a 1024-token
     window slides along the continuation, and we count how often it names the
     intended pianist. Two takes per pianist, each shown with the score the
     classifier gave it.
