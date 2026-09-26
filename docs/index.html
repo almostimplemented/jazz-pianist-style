@@ -132,6 +132,10 @@
   .guess button:hover { border-color: var(--accent); color: var(--accent); }
   .verdict { margin-top: .6rem; padding: .7rem .9rem; border-radius: 8px; font-size: .92rem;
              border: 1px solid var(--line); }
+  .verdict .tally { display: block; margin-top: .35rem; font-family: var(--mono); font-size: .72rem;
+                    color: var(--ink-dim); }
+  .sc-list button.got { color: var(--ink); }
+  .sc-list button.missed { color: #b58aa6; }
   .verdict.right { border-color: var(--accent); background: #1e1809; }
   .verdict.wrong { border-color: #6c4a60; background: #1d1319; }
   @media (max-width: 44rem) { .sc-list { grid-template-columns: repeat(3, 1fr); } }
@@ -308,8 +312,8 @@
 </div>
 
 <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
-<script src="roll.js?v=4"></script>
-<script src="app.js?v=4"></script>
-<script src="showcase.js?v=4"></script>
+<script src="roll.js?v=5"></script>
+<script src="app.js?v=5"></script>
+<script src="showcase.js?v=5"></script>
 </body>
 </html>

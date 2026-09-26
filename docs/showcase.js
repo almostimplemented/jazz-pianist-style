@@ -37,6 +37,7 @@
   };
   let roll = null;
   let items = [], order = [], active = 0, takeIdx = 0, blind = false, guessed = null;
+  let answers = new Map();  // blind session: item index -> guessed name
   let sampler = null, playing = false, startedAt = 0, offsetMs = 0, scheduledMs = 0;
 
   const fmt = (ms) => {
@@ -112,8 +113,8 @@
     takeIdx = tIdx;
     stopPlayback();
     offsetMs = 0;
-    guessed = null;
-    nodes.reveal.innerHTML = "";
+    guessed = blind && answers.has(idx) ? answers.get(idx) : null;
+    showVerdict();
     [...nodes.list.children].forEach((b, i) =>
       b.setAttribute("aria-pressed", String(order[i] === idx)));
     nodes.seek.max = String(take().duration_ms);
@@ -164,15 +165,30 @@
     nodes.time.textContent = `${fmt(nowMs())} / ${fmt(t.duration_ms)}`;
   }
 
-  function makeGuess(name) {
-    guessed = name;
+  function showVerdict() {
+    if (!blind || guessed === null) { nodes.reveal.innerHTML = ""; return; }
     const it = items[active];
-    const right = name === it.artist;
+    const right = guessed === it.artist;
+    const correct = [...answers].filter(([i, n]) => items[i].artist === n).length;
     nodes.reveal.innerHTML =
       `<div class="verdict ${right ? "right" : "wrong"}">` +
-      `You said <b>${name}</b>. It was <b>${it.artist}</b>.<br>` +
-      `The classifier agreed with ${it.artist} on ` +
-      `<b>${pct(take().agreement)}</b> of windows.</div>`;
+      (right ? `Yes &mdash; <b>${it.artist}</b>.` :
+               `You said ${guessed}; it was <b>${it.artist}</b>.`) +
+      ` The classifier named ${it.artist} on <b>${pct(take().agreement)}</b> of windows.` +
+      `<span class="tally">Your score: ${correct} of ${answers.size}` +
+      (answers.size < items.length ? " &middot; pick another pianist to keep going" : " &middot; that&rsquo;s all twelve") +
+      `</span></div>`;
+  }
+
+  function makeGuess(name) {
+    guessed = name;
+    answers.set(active, name);
+    const pos = order.indexOf(active);
+    const chip = nodes.list.children[pos];
+    const right = name === items[active].artist;
+    chip.textContent = `${right ? "\u2713" : "\u2717"} ${items[active].artist}`;
+    chip.classList.add(right ? "got" : "missed");
+    showVerdict();
     render();
   }
 
@@ -206,6 +222,7 @@
   nodes.seek.addEventListener("input", (e) => seekTo(Number(e.target.value)));
   nodes.blind.addEventListener("click", () => {
     blind = !blind;
+    answers = new Map();
     nodes.blind.setAttribute("aria-pressed", String(blind));
     nodes.blind.textContent = blind ? "blindfold: on" : "blindfold: off";
     guessed = null;
