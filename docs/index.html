@@ -158,6 +158,38 @@
   .rg-roll { grid-column: 2; grid-row: 2; height: 150px; }
   button.play.small { width: 2.4rem; height: 2.4rem; font-size: .9rem; grid-column: 1; grid-row: 2; }
   #rg-note:empty, #rg-status:empty { display: none; }
+  h3 { font-size: 1.02rem; margin: 1.8rem 0 .4rem; }
+  #how p { margin: 0 0 1rem; }
+  .jump { color: var(--ink-dim); font-size: .92rem; }
+  .jump a, #how a { color: var(--accent); }
+  .diagram { margin: 1.2rem 0 1.6rem; background: var(--bg-raised); border: 1px solid var(--line);
+             border-radius: var(--radius); padding: 1rem 1rem .8rem; }
+  .diagram { overflow-x: auto; }
+  .diagram svg { display: block; width: 100%; min-width: 34rem; height: auto; }
+  .diagram figcaption { color: var(--ink-dim); font-size: .88rem; margin-top: .6rem; }
+  .diagram .box { fill: #0d0b09; stroke: var(--line); stroke-width: 1.2; }
+  .diagram .box.norm { fill: none; stroke-dasharray: 3 3; }
+  .diagram .box.new, .diagram .box.emb { stroke: var(--accent); fill: #221a0d; }
+  .diagram .gate { fill: #221a0d; stroke: var(--accent); stroke-width: 1.2; }
+  .diagram .lbl { fill: var(--ink); font: 12px var(--mono); text-anchor: middle; }
+  .diagram .lbl.small { font-size: 10.5px; fill: var(--ink-dim); }
+  .diagram .sym { fill: var(--ink); font: italic 15px Georgia, serif; }
+  .diagram .note { fill: var(--ink-dim); font: 11px var(--mono); }
+  .diagram .note.mid { text-anchor: middle; }
+  .diagram .flow path { stroke: var(--ink-dim); stroke-width: 1.3; fill: none; }
+  .diagram .flow path.kv { stroke: var(--accent); }
+  .diagram .ah { fill: var(--ink-dim); }
+  .diagram .res path { stroke: var(--ink-dim); opacity: .45; stroke-width: 1.2; fill: none; stroke-dasharray: 4 4; }
+  .diagram .ahk { fill: var(--accent); }
+  .results { border-collapse: collapse; width: 100%; font-size: .95rem; margin: .4rem 0 .2rem; }
+  .results th { text-align: left; font-family: var(--mono); font-size: .72rem; font-weight: normal;
+                color: var(--ink-dim); border-bottom: 1px solid var(--line); padding: .4rem .6rem .4rem 0; }
+  .results td { padding: .45rem .6rem .45rem 0; border-bottom: 1px solid var(--line); }
+  .results th:not(:first-child), .results td:not(:first-child) { text-align: right;
+                font-variant-numeric: tabular-nums; }
+  .results tr.ours td { color: var(--accent); }
+  .evals { padding-left: 1.1rem; margin: .4rem 0 1rem; }
+  .evals li { margin-bottom: .8rem; }
   @media (max-width: 44rem) { .rg-pair { grid-template-columns: 1fr; } }
   @media (max-width: 44rem) {
     .sc-list { grid-template-columns: repeat(2, 1fr); }
@@ -179,6 +211,7 @@
     <a href="#demo">Listen</a>
     <a href="#scored">Scored takes</a>
     <a href="#regions">Where style lives</a>
+    <a href="#how">How it works</a>
     <a href="#about">About</a>
     <a href="https://github.com/almostimplemented/jazz-pianist-style">Code</a>
     <a href="https://github.com/almostimplemented/PiJAMA">PiJAMA dataset</a>
@@ -213,6 +246,7 @@
     classifier trained <em>only</em> on generated music then identifies real
     recordings with 95% accuracy.
   </p>
+  <p class="jump">Listen first; <a href="#how">how it works</a> is further down.</p>
 </section>
 
 <section id="demo">
@@ -324,6 +358,126 @@
     <p class="hint" id="rg-note"></p>
     <p class="status" id="rg-status"></p>
   </div>
+</section>
+
+<section id="how">
+  <h2>How it works</h2>
+
+  <h3>The model</h3>
+  <p>
+    We start from Aria, a 16-layer transformer pretrained on a large corpus of
+    piano MIDI. Into each of its last eight layers we insert a cross-attention
+    block: the music attends to a small learned embedding for the chosen
+    pianist, four vectors per pianist. A learned gate scales what the block
+    adds, starting at 0.1, so fine-tuning begins from Aria&rsquo;s own behaviour
+    and learns how much to listen. Because the embedding is attended to at
+    every step, the conditioning does not fade as generation goes on, the way a
+    prompt prefix does.
+  </p>
+  <figure class="diagram">
+    <svg viewBox="0 0 750 190" role="img" aria-labelledby="arch-title">
+      <title id="arch-title">One transformer layer with the added gated cross-attention block</title>
+      <defs>
+        <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" class="ah"/>
+        </marker>
+        <marker id="ahk" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" class="ahk"/>
+        </marker>
+      </defs>
+      <g class="res">
+        <path d="M24,62 Q113,10 202,53"/>
+        <path d="M202,53 Q336,0 471,53"/>
+        <path d="M471,53 Q573,6 675,53"/>
+      </g>
+      <text x="4" y="75" class="sym">x</text>
+      <g class="flow">
+        <path d="M20,70 H34" marker-end="url(#ah)"/>
+        <path d="M152,70 H172" marker-end="url(#ah)"/>
+        <path d="M230,70 H250" marker-end="url(#ah)"/>
+        <path d="M376,70 H391" marker-end="url(#ah)"/>
+        <path d="M423,70 H441" marker-end="url(#ah)"/>
+        <path d="M499,70 H519" marker-end="url(#ah)"/>
+        <path d="M625,70 H645" marker-end="url(#ah)"/>
+        <path d="M703,70 H719" marker-end="url(#ah)"/>
+        <path d="M314,137 V90" marker-end="url(#ahk)" class="kv"/>
+      </g>
+      <rect x="36" y="53" width="116" height="34" rx="5" class="box"/>
+      <text x="94" y="74" class="lbl">Self-attention</text>
+      <rect x="174" y="53" width="56" height="34" rx="5" class="box norm"/>
+      <text x="202" y="67" class="lbl small">Add &amp;</text>
+      <text x="202" y="80" class="lbl small">norm</text>
+      <rect x="252" y="53" width="124" height="34" rx="5" class="box new"/>
+      <text x="314" y="74" class="lbl">Cross-attention</text>
+      <circle cx="408" cy="70" r="15" class="gate"/>
+      <text x="408" y="74" class="lbl">&#215;g</text>
+      <rect x="443" y="53" width="56" height="34" rx="5" class="box norm"/>
+      <text x="471" y="67" class="lbl small">Add &amp;</text>
+      <text x="471" y="80" class="lbl small">norm</text>
+      <rect x="521" y="53" width="104" height="34" rx="5" class="box"/>
+      <text x="573" y="74" class="lbl">Feed-forward</text>
+      <rect x="647" y="53" width="56" height="34" rx="5" class="box norm"/>
+      <text x="675" y="67" class="lbl small">Add &amp;</text>
+      <text x="675" y="80" class="lbl small">norm</text>
+      <text x="723" y="75" class="sym">x&#8242;</text>
+      <text x="324" y="117" class="note">keys, values</text>
+      <rect x="244" y="139" width="140" height="30" rx="5" class="box emb"/>
+      <text x="314" y="158" class="lbl">pianist embedding</text>
+      <text x="314" y="185" class="note mid">4 learned vectors</text>
+    </svg>
+    <figcaption>
+      One of the eight adapted layers. The new pieces are in amber: the music
+      supplies the queries, the pianist embedding supplies keys and values, and
+      the gate <i>g</i> scales the result before it joins the residual stream.
+    </figcaption>
+  </figure>
+
+  <h3>Why not just perplexity?</h3>
+  <p>
+    The usual measure, perplexity on held-out music, barely notices the
+    conditioning: given the real preceding notes, the next note is predictable
+    whoever is playing. Style shows up when the model generates freely and has
+    to stay in character on its own output.
+  </p>
+  <table class="results">
+    <thead><tr><th>Model</th><th>Perplexity</th><th>Agreement</th></tr></thead>
+    <tbody>
+      <tr><td>Pretrained Aria</td><td>11.41</td><td>25%</td></tr>
+      <tr><td>Fine-tuned, no conditioning</td><td>6.96</td><td>37%</td></tr>
+      <tr class="ours"><td>Fine-tuned with pianist conditioning</td><td>6.82</td><td>70%</td></tr>
+    </tbody>
+  </table>
+  <p class="hint">
+    Agreement: how often the pianist classifier names the intended pianist in
+    windows slid along 4096-token continuations of 256-token prompts.
+  </p>
+
+  <h3>Three ways to check the style</h3>
+  <ul class="evals">
+    <li>
+      <b>Sliding-window agreement.</b> A classifier that identifies 98.8% of
+      held-out songs is slid along each continuation. Conditioned music is
+      attributed to the intended pianist 70% of the time against 37% without
+      conditioning, and the gap holds for the whole continuation. The strips
+      under the <a href="#scored">scored takes</a> are this measurement.
+    </li>
+    <li>
+      <b>Synthetic transfer.</b> A fresh classifier trained <em>only</em> on
+      generated music identifies real recordings: 87% of 1024-token chunks and
+      95% of songs, within nine points of one trained on real data. The
+      <a href="#scored">scored takes</a> are samples of that training data.
+    </li>
+    <li>
+      <b>Characteristic regions.</b> Turned on real performances, the
+      classifier points to where a pianist&rsquo;s style is most concentrated
+      &mdash; <a href="#regions">where the style lives</a>.
+    </li>
+  </ul>
+  <p>
+    The paper has the details: per-pianist results, the mismatch experiment
+    (prompting with one pianist and conditioning on another), memorization
+    checks, and a from-scratch classifier that confirms the transfer result.
+  </p>
 </section>
 
 <section class="about" id="about">
