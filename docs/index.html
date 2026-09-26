@@ -161,7 +161,7 @@
   h3 { font-size: 1.02rem; margin: 1.8rem 0 .4rem; }
   #how p { margin: 0 0 1rem; }
   .jump { color: var(--ink-dim); font-size: .92rem; }
-  .jump a, #how a { color: var(--accent); }
+  .jump a, #how a, .about a { color: var(--accent); }
   .diagram { margin: 1.2rem 0 1.6rem; background: var(--bg-raised); border: 1px solid var(--line);
              border-radius: var(--radius); padding: 1rem 1rem .8rem; }
   .diagram { overflow-x: auto; }
@@ -214,7 +214,6 @@
     <a href="#how">How it works</a>
     <a href="#about">About</a>
     <a href="https://github.com/almostimplemented/jazz-pianist-style">Code</a>
-    <a href="https://github.com/almostimplemented/PiJAMA">PiJAMA dataset</a>
   </div>
 </header>
 
@@ -237,8 +236,8 @@
     the twelve pianists we study &mdash; and so is Hyman himself.
   </p>
   <p>
-    We fine-tune Aria, a transformer pretrained on piano MIDI, on solo
-    performances by twelve jazz pianists, adding a gated cross-attention
+    We fine-tune <a href="https://arxiv.org/abs/2506.23869">Aria</a>, a transformer pretrained on piano MIDI, on solo
+    performances by twelve jazz pianists from the <a href="https://transactions.ismir.net/articles/10.5334/tismir.162">PiJAMA</a> dataset, adding a gated cross-attention
     layer that reads a learned embedding for each pianist. To check whether
     the style comes through, we slide a pianist classifier along the
     generated music: conditioned continuations are attributed to the intended
@@ -365,7 +364,8 @@
 
   <h3>The model</h3>
   <p>
-    We start from Aria, a 16-layer transformer pretrained on a large corpus of
+    We start from <a href="https://arxiv.org/abs/2506.23869">Aria</a> (Bradshaw et al., ISMIR 2025;
+    <a href="https://github.com/EleutherAI/aria">code</a>), a 16-layer transformer pretrained on a large corpus of
     piano MIDI. Into each of its last eight layers we insert a cross-attention
     block: the music attends to a small learned embedding for the chosen
     pianist, four vectors per pianist. A learned gate scales what the block
@@ -490,7 +490,7 @@
   </p>
   <p>
     <b>The twelve pianists were chosen for separability:</b> they are the
-    twelve of PiJAMA&rsquo;s thirty whose recordings a pretrained model already
+    twelve of <a href="https://transactions.ismir.net/articles/10.5334/tismir.162">PiJAMA</a>&rsquo;s thirty whose recordings a pretrained model already
     tells apart most easily. Within them the model imitates some far better
     than others &mdash; across the paper&rsquo;s evaluation, continuations
     were attributed to the intended pianist 96% of the time for Hank Jones and
