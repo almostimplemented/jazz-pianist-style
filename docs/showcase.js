@@ -1,8 +1,9 @@
 /* Scored continuations + blindfold test.
  *
- * Each pianist has two takes: continuations of their own held-out
- * performances, drawn from the paper's synthetic corpus and scored by the
+ * Each pianist has two takes: continuations of a few bars of their own
+ * playing, drawn from the paper's synthetic-transfer corpus and scored by the
  * sliding-window classifier. The score shown is the score each take got.
+ * In blind mode the list is shuffled, so its order gives nothing away.
  */
 (() => {
   "use strict";
@@ -35,7 +36,7 @@
     gen: css.getPropertyValue("--accent").trim() || "#e0a33e",
   };
   let roll = null;
-  let items = [], active = 0, takeIdx = 0, blind = false, guessed = null;
+  let items = [], order = [], active = 0, takeIdx = 0, blind = false, guessed = null;
   let sampler = null, playing = false, startedAt = 0, offsetMs = 0, scheduledMs = 0;
 
   const fmt = (ms) => {
@@ -93,6 +94,7 @@
   async function startPlayback() {
     await Tone.start();
     await initAudio();
+    document.dispatchEvent(new CustomEvent("demo:play", { detail: "showcase" }));
     playing = true;
     startedAt = Tone.now();
     scheduledMs = offsetMs;
@@ -113,7 +115,7 @@
     guessed = null;
     nodes.reveal.innerHTML = "";
     [...nodes.list.children].forEach((b, i) =>
-      b.setAttribute("aria-pressed", String(i === idx)));
+      b.setAttribute("aria-pressed", String(order[i] === idx)));
     nodes.seek.max = String(take().duration_ms);
     render();
   }
@@ -138,7 +140,7 @@
     const hidden = blind && guessed === null;
 
     nodes.label.innerHTML = hidden
-      ? `<span class="masked">a held-out performance</span>`
+      ? `<span class="masked">mystery pianist</span>`
       : `<b>${it.artist}</b>` +
         `<span class="sub">continuing &ldquo;${t.prompt_title}&rdquo;</span>`;
 
@@ -176,11 +178,17 @@
 
   function rebuildList() {
     nodes.list.innerHTML = "";
-    items.forEach((it, i) => {
+    order = items.map((_, i) => i);
+    if (blind) {
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+    }
+    order.forEach((i, pos) => {
+      const it = items[i];
       const b = document.createElement("button");
-      b.innerHTML = `<span class="idx">${String(i + 1).padStart(2, "0")}</span>` +
-        `<span class="nm">${blind ? "performance" : it.artist}</span>` +
-        (blind ? "" : `<span class="ag">${pct(it.takes[0].agreement)}</span>`);
+      b.textContent = blind ? `Pianist ${String.fromCharCode(65 + pos)}` : it.artist;
       b.setAttribute("aria-pressed", String(i === active));
       b.addEventListener("click", () => select(i));
       nodes.list.appendChild(b);
@@ -199,12 +207,14 @@
   nodes.blind.addEventListener("click", () => {
     blind = !blind;
     nodes.blind.setAttribute("aria-pressed", String(blind));
-    nodes.blind.textContent = blind ? "showing: blind" : "showing: labelled";
+    nodes.blind.textContent = blind ? "blindfold: on" : "blindfold: off";
     guessed = null;
     nodes.reveal.innerHTML = "";
-    takeIdx = 0;
     rebuildList();
-    render();
+    select(order[0]);
+  });
+  document.addEventListener("demo:play", (e) => {
+    if (e.detail !== "showcase" && playing) stopPlayback();
   });
 
   fetch(DATA_URL)
@@ -220,7 +230,7 @@
         nodes.guessBtns.appendChild(g);
       }
       roll = makeRoll(nodes.canvas);
-      select(0);
+      select(Math.max(0, items.findIndex((i) => i.artist === "Art Tatum")));
       setInterval(pump, 50);
       (function frame() {
         if (items.length) {
@@ -236,7 +246,7 @@
             ],
             nowMs: cur,
             branchMs: t.branch_ms,
-            branchLabel: blind && guessed === null ? "model takes over" : "model takes over",
+            branchLabel: "model takes over",
           });
         }
         requestAnimationFrame(frame);

@@ -108,6 +108,7 @@
   async function play() {
     await Tone.start();
     await initAudio();
+    document.dispatchEvent(new CustomEvent("demo:play", { detail: "shared-prompt" }));
     playing = true;
     startedAt = Tone.now();
     scheduledMs = offsetMs;
@@ -189,6 +190,9 @@
   el.restart.addEventListener("click", () => seekTo(0));
   el.seek.addEventListener("input", (e) => seekTo(Number(e.target.value)));
   window.addEventListener("resize", () => { resize(); draw(); });
+  document.addEventListener("demo:play", (e) => {
+    if (e.detail !== "shared-prompt" && playing) stop();
+  });
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && e.target === document.body) {
       e.preventDefault();
@@ -211,7 +215,7 @@
         el.artists.appendChild(b);
       });
       resize();
-      setArtist(0);
+      setArtist(Math.max(0, data.artists.findIndex((a) => a.name === "Art Tatum")));
       el.status.textContent = "";
       requestAnimationFrame(frame);
       // Audio runs on a timer, not the animation frame: hidden tabs stop

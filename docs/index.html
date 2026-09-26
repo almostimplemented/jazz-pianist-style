@@ -25,7 +25,7 @@
     font-family: Georgia, "Iowan Old Style", serif;
     line-height: 1.6; -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 60rem; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+  .wrap { max-width: 50rem; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
   header { margin-bottom: 2.5rem; }
   h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); line-height: 1.2; margin: 0 0 .6rem; }
   .authors { color: var(--ink-dim); margin: 0 0 .25rem; }
@@ -78,29 +78,28 @@
     border-color: var(--accent); color: var(--accent); background: #221a0d;
   }
   .hint { color: var(--ink-dim); font-size: .9rem; margin: .75rem 0 0; }
-  .intro p { margin: 0 0 1rem; max-width: 42rem; }
-  .intro .pianists { color: var(--ink-dim); font-size: .92rem; }
-  .intro .note { color: var(--ink-dim); font-size: .88rem; border-left: 2px solid var(--line);
-                 padding-left: .9rem; }
+  .intro p { margin: 0 0 1rem; }
+  .about p { color: var(--ink-dim); margin: 0 0 1rem; }
+  .about b { color: var(--ink); font-weight: normal; }
   .status { font-family: var(--mono); font-size: .8rem; color: var(--ink-dim); min-height: 1.2em; }
   footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
            color: var(--ink-dim); font-size: .9rem; }
+  footer a { color: var(--accent); }
+  .bib { font-family: var(--mono); font-size: .72rem; color: var(--ink-dim); background: var(--bg-raised);
+         border: 1px solid var(--line); border-radius: 8px; padding: .8rem 1rem; overflow-x: auto; }
   code { font-family: var(--mono); font-size: .85em; color: var(--accent); }
 
   /* scored continuations */
-  .showcase { display: grid; grid-template-columns: minmax(11rem, 15rem) 1fr; gap: 1rem;
-              background: var(--bg-raised); border: 1px solid var(--line);
+  .showcase { background: var(--bg-raised); border: 1px solid var(--line);
               border-radius: var(--radius); padding: 1.25rem; }
-  .sc-list { display: flex; flex-direction: column; gap: .3rem; max-height: 26rem; overflow-y: auto; }
-  .sc-list button { display: grid; grid-template-columns: 1.6rem 1fr auto; align-items: center;
-                    gap: .5rem; background: none; border: 1px solid transparent; color: var(--ink-dim);
-                    border-radius: 6px; padding: .45rem .5rem; cursor: pointer; text-align: left;
-                    font-family: inherit; font-size: .88rem; }
-  .sc-list button:hover { border-color: var(--line); color: var(--ink); }
+  .sc-list { display: grid; grid-template-columns: repeat(6, 1fr);
+             gap: .35rem; margin-bottom: 1.1rem; }
+  .sc-list button { background: none; border: 1px solid var(--line); color: var(--ink-dim);
+                    border-radius: 6px; padding: .4rem .6rem; cursor: pointer; text-align: left;
+                    font-family: inherit; font-size: .86rem; }
+  .sc-list button:hover { border-color: var(--accent-dim); color: var(--ink); }
   .sc-list button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent);
                                          background: #221a0d; }
-  .sc-list .idx { font-family: var(--mono); font-size: .7rem; opacity: .6; }
-  .sc-list .ag { font-family: var(--mono); font-size: .72rem; opacity: .75; }
   .sc-takes { display: flex; gap: .35rem; margin-top: .55rem; }
   .sc-takes button { background: none; border: 1px solid var(--line); color: var(--ink-dim);
                      border-radius: 999px; padding: .22rem .65rem; cursor: pointer;
@@ -123,7 +122,6 @@
   .sc-strip.masked .cell { background: var(--line) !important; opacity: 1 !important; }
   .sc-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-family: var(--mono);
                font-size: .68rem; color: var(--ink-dim); margin-bottom: .8rem; }
-  .sc-legend .right { margin-left: auto; }
   .sw { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px;
         background: var(--accent); vertical-align: -1px; margin-right: .2rem; }
   .sw.miss { background: #7d5a72; }
@@ -136,7 +134,8 @@
              border: 1px solid var(--line); }
   .verdict.right { border-color: var(--accent); background: #1e1809; }
   .verdict.wrong { border-color: #6c4a60; background: #1d1319; }
-  @media (max-width: 40rem) { .showcase { grid-template-columns: 1fr; } }
+  @media (max-width: 44rem) { .sc-list { grid-template-columns: repeat(3, 1fr); } }
+  #cont-status:empty, #reveal:empty { display: none; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -149,6 +148,7 @@
   <div class="links">
     <a href="#demo">Listen</a>
     <a href="#scored">Scored takes</a>
+    <a href="#about">About</a>
     <a href="https://github.com/almostimplemented/jazz-pianist-style">Code</a>
     <a href="https://github.com/almostimplemented/PiJAMA">PiJAMA dataset</a>
   </div>
@@ -163,33 +163,14 @@
     playing, but play in their manner.
   </p>
   <p>
-    We start from Aria, a transformer pretrained on a large corpus of piano
-    MIDI, and fine-tune it on solo performances from the PiJAMA dataset with
-    one addition: a gated cross-attention layer that reads a learned
-    embedding for each pianist. A prompt prefix loses its grip as generation
-    goes on; this channel is available at every step, so the conditioning
-    holds through long continuations.
-  </p>
-  <p>
-    To measure style we trained a classifier to tell the twelve pianists apart
-    (98.8% of held-out songs). Slid along generated music, it names the
-    intended pianist 70% of the time, against 37% without conditioning. And a
-    second classifier trained <em>only</em> on the model&rsquo;s generations
-    identifies real recordings with 95% accuracy &mdash; the generated music
-    carries style that transfers back to human playing.
-  </p>
-  <p class="pianists">
-    The twelve: Art Tatum, Erroll Garner, Abdullah Ibrahim, Horace Parlan,
-    Tete Montoliu, Oscar Peterson, Hank Jones, Dick Hyman, Cedar Walton,
-    George Cables, Andy Laverne, and Dave McKenna.
-  </p>
-  <p class="note">
-    Everything here is MIDI, played in your browser on a sampled piano; the
-    training data are automatic transcriptions of recordings, so dynamics and
-    pedalling are approximate. The twelve were chosen because their styles
-    are the most separable of PiJAMA&rsquo;s thirty, and the model imitates
-    some far better than others: conditioned agreement ranges from 96%
-    (Hank Jones, Dick Hyman) to 29% (Cedar Walton).
+    We fine-tune Aria, a transformer pretrained on piano MIDI, on solo
+    performances by twelve jazz pianists, adding a gated cross-attention
+    layer that reads a learned embedding for each pianist. To check whether
+    the style comes through, we slide a pianist classifier along the
+    generated music: conditioned continuations are attributed to the intended
+    pianist 70% of the time, against 37% without conditioning. A second
+    classifier trained <em>only</em> on generated music then identifies real
+    recordings with 95% accuracy.
   </p>
 </section>
 
@@ -229,20 +210,16 @@
 <section id="scored">
   <h2>Twelve continuations, scored</h2>
   <p class="lede">
-    A shared prompt makes for a clean comparison, but it also pulls every
-    pianist toward the same tune. Here each pianist instead continues a few
-    bars of <em>their own</em> playing. These takes come from the corpus of
-    generated music that the paper&rsquo;s synthetic-only classifier learned
-    from; the generations resemble their closest training performance less
-    than held-out real performances do, so the model is not replaying what it
-    heard. Alongside each take is what the classifier heard: a 1024-token
-    window slides along the continuation, and we count how often it names the
-    intended pianist. Two takes per pianist, each shown with the score the
-    classifier gave it.
+    A shared prompt pulls every pianist toward the same tune. Here each
+    pianist instead continues a few bars of <em>their own</em> playing. The
+    strip under each take shows what our classifier heard as it slid along
+    the continuation, one cell per window of about 300 notes: gold where it
+    named the intended pianist, mauve where it named someone else. Or switch
+    on the blindfold and guess for yourself.
   </p>
 
   <div class="showcase">
-    <div class="sc-list" id="cont-list" role="group" aria-label="Choose a continuation"></div>
+    <div class="sc-list" id="cont-list" role="group" aria-label="Choose a pianist"></div>
     <div class="sc-main">
       <div class="sc-head">
         <div>
@@ -256,7 +233,7 @@
       <div class="sc-legend">
         <span><i class="sw hit"></i> classifier names the intended pianist</span>
         <span><i class="sw miss"></i> names someone else</span>
-        <span class="right">opacity = confidence</span>
+        <span>fainter = less confident</span>
       </div>
       <div class="transport">
         <button class="play" id="cont-play" aria-label="Play">&#9654;</button>
@@ -264,7 +241,7 @@
           <input type="range" id="cont-seek" min="0" max="1000" value="0" aria-label="Seek">
           <span class="time" id="cont-time">0:00 / 0:00</span>
         </div>
-        <button class="ghost" id="blind-toggle" aria-pressed="false">showing: labelled</button>
+        <button class="ghost" id="blind-toggle" aria-pressed="false">blindfold: off</button>
       </div>
       <div id="guess-panel" hidden>
         <p class="hint">Blindfold test: who is playing?</p>
@@ -277,19 +254,62 @@
 </section>
 
 
+<section class="about" id="about">
+  <h2>About these examples</h2>
+  <p>
+    <b>Everything here is MIDI,</b> rendered in your browser on a sampled
+    piano. The model was trained on automatic transcriptions of commercial
+    recordings, so dynamics and pedalling are approximate, and the rendering
+    is plainer than the records.
+  </p>
+  <p>
+    <b>The twelve pianists were chosen for separability:</b> they are the
+    twelve of PiJAMA&rsquo;s thirty whose recordings a pretrained model already
+    tells apart most easily. Within them the model imitates some far better
+    than others &mdash; across the paper&rsquo;s evaluation, continuations
+    were attributed to the intended pianist 96% of the time for Hank Jones and
+    Dick Hyman, but only 29% for Cedar Walton.
+  </p>
+  <p>
+    <b>The scored takes are selected, not copied.</b> They are
+    samples from the corpus of generated music that the paper&rsquo;s
+    synthetic-only classifier learned from; for each pianist we show the two
+    highest-scoring of eight candidates. Their prompts come from the training
+    recordings, and the paper checks that the continuations do not copy them:
+    they resemble their closest training performance less than real held-out
+    performances do.
+  </p>
+  <p>
+    <b>The scores come from a classifier,</b> not from listeners. It is a
+    strong one (98.8% of held-out songs), but it has habits: many of its
+    mistakes on generated music land on Dick Hyman. A listening study is the natural next step.
+  </p>
+  <p>
+    This is a research tool for studying pianist style, in the spirit of
+    Hyman&rsquo;s etudes &mdash; not a system for imitating anyone at their
+    expense.
+  </p>
+</section>
+
 <footer>
   <p>
-    Built on <a href="https://github.com/EleutherAI/aria" style="color:var(--accent)">Aria</a>
-    and the <a href="https://github.com/almostimplemented/PiJAMA" style="color:var(--accent)">PiJAMA</a>
-    dataset. Research tool for studying pianist style, not a system for imitation
-    at anyone&rsquo;s expense &mdash; see the paper&rsquo;s ethics discussion.
+    Built on <a href="https://github.com/EleutherAI/aria">Aria</a>
+    and the <a href="https://github.com/almostimplemented/PiJAMA">PiJAMA</a>
+    dataset. Code, checkpoints, and evaluation scripts:
+    <a href="https://github.com/almostimplemented/jazz-pianist-style">on GitHub</a>.
   </p>
+  <pre class="bib">@inproceedings{edwards2026jazzstyle,
+  title     = {Learning Jazz Pianist Style with Cross-Attention Conditioning},
+  author    = {Edwards, Drew and Maezawa, Akira and Dixon, Simon},
+  booktitle = {Proc. Int. Society for Music Information Retrieval Conf. (ISMIR)},
+  year      = {2026},
+}</pre>
 </footer>
 </div>
 
 <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
-<script src="roll.js"></script>
-<script src="app.js"></script>
-<script src="showcase.js"></script>
+<script src="roll.js?v=4"></script>
+<script src="app.js?v=4"></script>
+<script src="showcase.js?v=4"></script>
 </body>
 </html>
