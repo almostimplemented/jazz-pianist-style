@@ -11,3 +11,5 @@ data/resnet_transfer/
 data/eval/
 results/
 samples/
+render/
+docs/audio/
