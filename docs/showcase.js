@@ -9,8 +9,6 @@
   "use strict";
 
   const DATA_URL = "data/continuations.json";
-  const LOOKAHEAD_VISIBLE_MS = 150;
-  const LOOKAHEAD_HIDDEN_MS = 3000;
 
   const el = (id) => document.getElementById(id);
   const nodes = {
@@ -38,7 +36,6 @@
   let roll = null;
   let items = [], order = [], active = 0, takeIdx = 0, blind = false, guessed = null;
   let answers = new Map();  // blind session: item index -> guessed name
-  let sampler = null, playing = false, startedAt = 0, offsetMs = 0, scheduledMs = 0;
 
   const fmt = (ms) => {
     const s = Math.max(0, Math.floor(ms / 1000));
@@ -47,59 +44,35 @@
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const pct = (a) => `${Math.round(a * 100)}%`;
   const take = () => items[active].takes[takeIdx];
-  const nowMs = () => (playing ? offsetMs + (Tone.now() - startedAt) * 1000 : offsetMs);
+  const clipId = () => `sc__${clipSlug(items[active].artist)}__take${takeIdx + 1}`;
 
-  async function initAudio() {
-    if (sampler) return;
-    nodes.status.textContent = "Loading piano samples…";
-    sampler = await getSampler();
-    nodes.status.textContent = "";
+  function setPlayButton(on) {
+    nodes.play.innerHTML = on ? "&#10073;&#10073;" : "&#9654;";
+    nodes.play.setAttribute("aria-label", on ? "Pause" : "Play");
   }
 
-  function pump() {
-    if (!playing || !sampler) return;
-    const cur = nowMs();
-    const until = cur + (document.hidden ? LOOKAHEAD_HIDDEN_MS : LOOKAHEAD_VISIBLE_MS);
-    const t0 = Tone.now();
-    const t = take();
-    for (const notes of [t.prompt_notes, t.notes]) {
-      for (let i = 0; i < notes.length; i += 4) {
-        const start = notes[i];
-        if (start < scheduledMs) continue;
-        if (start >= until) break;
-        try {
-          sampler.triggerAttackRelease(midiToNote(notes[i + 2]),
-            Math.max(0.05, notes[i + 1] / 1000),
-            t0 + Math.max(0, (start - cur) / 1000),
-            clamp(notes[i + 3] / 127, 0.05, 1));
-        } catch (e) { /* out-of-range note */ }
-      }
-    }
-    scheduledMs = Math.max(scheduledMs, until);
-    if (cur >= take().duration_ms) stopPlayback(true);
-  }
+  const voice = makeVoice({
+    onStatus: (s) => { nodes.status.textContent = s; },
+    onEnded: () => { voice.position = 0; setPlayButton(false); },
+  });
 
   async function startPlayback() {
-    await Tone.start();
-    await initAudio();
     document.dispatchEvent(new CustomEvent("demo:play", { detail: "showcase" }));
-    playing = true;
-    startedAt = Tone.now();
-    scheduledMs = offsetMs;
-    nodes.play.innerHTML = "&#10073;&#10073;";
+    const t = take();
+    await voice.play(clipId(), t.prompt_notes.concat(t.notes));
+    setPlayButton(true);
   }
-  function stopPlayback(ended = false) {
-    if (playing) offsetMs = ended ? 0 : nowMs();
-    playing = false;
-    if (sampler) sampler.releaseAll();
-    nodes.play.innerHTML = "&#9654;";
+  function stopPlayback() {
+    voice.stop();
+    setPlayButton(false);
   }
 
   function select(idx, tIdx = 0) {
+    stopPlayback();
     active = idx;
     takeIdx = tIdx;
-    stopPlayback();
-    offsetMs = 0;
+    voice.setEnd(take().duration_ms);
+    voice.position = 0;
     guessed = blind && answers.has(idx) ? answers.get(idx) : null;
     showVerdict();
     [...nodes.list.children].forEach((b, i) =>
@@ -149,7 +122,7 @@
     nodes.strip.classList.toggle("masked", hidden);
     renderStrip();
     nodes.guess.hidden = !blind || guessed !== null;
-    nodes.time.textContent = `${fmt(nowMs())} / ${fmt(t.duration_ms)}`;
+    nodes.time.textContent = `${fmt(voice.nowMs())} / ${fmt(t.duration_ms)}`;
   }
 
   function showVerdict() {
@@ -173,7 +146,7 @@
     const pos = order.indexOf(active);
     const chip = nodes.list.children[pos];
     const right = name === items[active].artist;
-    chip.textContent = `${right ? "\u2713" : "\u2717"} ${items[active].artist}`;
+    chip.textContent = `${right ? "✓" : "✗"} ${items[active].artist}`;
     chip.classList.add(right ? "got" : "missed");
     showVerdict();
     render();
@@ -198,15 +171,9 @@
     });
   }
 
-  function seekTo(ms) {
-    const was = playing;
-    if (was) stopPlayback();
-    offsetMs = clamp(ms, 0, take().duration_ms);
-    if (was) startPlayback();
-  }
-
-  nodes.play.addEventListener("click", () => (playing ? stopPlayback() : startPlayback()));
-  nodes.seek.addEventListener("input", (e) => seekTo(Number(e.target.value)));
+  nodes.play.addEventListener("click", () => (voice.playing ? stopPlayback() : startPlayback()));
+  nodes.seek.addEventListener("input", (e) =>
+    voice.seek(clamp(Number(e.target.value), 0, take().duration_ms)));
   nodes.blind.addEventListener("click", () => {
     blind = !blind;
     answers = new Map();
@@ -218,7 +185,7 @@
     select(order[0]);
   });
   document.addEventListener("demo:play", (e) => {
-    if (e.detail !== "showcase" && playing) stopPlayback();
+    if (e.detail !== "showcase" && voice.playing) stopPlayback();
   });
 
   fetch(DATA_URL, { cache: "no-cache" })
@@ -235,11 +202,10 @@
       }
       roll = makeRoll(nodes.canvas);
       select(Math.max(0, items.findIndex((i) => i.artist === "Art Tatum")));
-      setInterval(pump, 50);
       (function frame() {
         if (items.length) {
           const t = take();
-          const cur = nowMs();
+          const cur = voice.nowMs();
           nodes.time.textContent = `${fmt(cur)} / ${fmt(t.duration_ms)}`;
           if (document.activeElement !== nodes.seek)
             nodes.seek.value = String(Math.round(cur));

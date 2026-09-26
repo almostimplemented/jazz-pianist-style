@@ -1,15 +1,13 @@
 /* One prompt, twelve pianists — live style-swap player.
  *
- * Every continuation shares an opening prompt and then diverges, so playback
- * keeps a single clock: switching pianist mid-performance simply changes which
- * note stream feeds the scheduler from that moment on.
+ * Every take shares an opening prompt and then diverges, so playback keeps a
+ * single clock: switching pianist mid-performance changes which take is
+ * sounding from that moment on, at the same position in the music.
  */
 (() => {
   "use strict";
 
   const DATA_URL = "data/aint_misbehavin.json";
-  const LOOKAHEAD_VISIBLE_MS = 150;  // responsive swaps while watching
-  const LOOKAHEAD_HIDDEN_MS = 3000;  // background tabs clamp timers to ~1s
   const WINDOW_MS = 8000;     // piano-roll time span
   const PLAYHEAD_FRAC = 0.28; // playhead position within that span
 
@@ -23,22 +21,14 @@
     artists: document.getElementById("artists"),
     status: document.getElementById("status"),
   };
-  const ctx = el.canvas.getContext("2d");
   const css = getComputedStyle(document.documentElement);
   const COLOR = {
     prompt: css.getPropertyValue("--prompt").trim() || "#6f8fa8",
     gen: css.getPropertyValue("--accent").trim() || "#e0a33e",
-    line: css.getPropertyValue("--line").trim() || "#2e2823",
-    dim: css.getPropertyValue("--ink-dim").trim() || "#a89e91",
   };
 
   let data = null;         // parsed payload
   let active = 0;          // index into data.artists
-  let sampler = null;
-  let playing = false;
-  let startedAt = 0;       // Tone context time when playback (re)started
-  let offsetMs = 0;        // position in the piece at that moment
-  let scheduledMs = 0;     // notes strictly before this are already scheduled
   let durationMs = 1;      // the selected take's own length
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -46,69 +36,36 @@
     const s = Math.max(0, Math.floor(ms / 1000));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   };
+  const clipId = (a) => `am__${clipSlug(a.name)}`;
 
-  function nowMs() {
-    if (!playing) return offsetMs;
-    return offsetMs + (Tone.now() - startedAt) * 1000;
+  function setPlayButton(on) {
+    el.play.innerHTML = on ? "&#10073;&#10073;" : "&#9654;";
+    el.play.setAttribute("aria-label", on ? "Pause" : "Play");
   }
 
-  /* ---------- audio ---------- */
+  const voice = makeVoice({
+    onStatus: (s) => { el.status.textContent = s; },
+    onEnded: () => setPlayButton(false),
+  });
 
-  async function initAudio() {
-    if (sampler) return;
-    el.status.textContent = "Loading piano samples…";
-    sampler = await getSampler();
-    el.status.textContent = "";
-  }
-
-  /* Schedule any notes of the active stream that fall inside the lookahead. */
-  function pump() {
-    if (!playing || !sampler) return;
-    const cur = nowMs();
-    const until = cur + (document.hidden ? LOOKAHEAD_HIDDEN_MS : LOOKAHEAD_VISIBLE_MS);
-    const notes = data.artists[active].notes;
-    const t0 = Tone.now();
-
-    for (let i = 0; i < notes.length; i += 4) {
-      const start = notes[i];
-      if (start < scheduledMs) continue;
-      if (start >= until) break;
-      const dur = notes[i + 1], pitch = notes[i + 2], vel = notes[i + 3];
-      const when = t0 + Math.max(0, (start - cur) / 1000);
-      try {
-        sampler.triggerAttackRelease(
-          midiToNote(pitch), Math.max(0.05, dur / 1000), when, clamp(vel / 127, 0.05, 1));
-      } catch (e) { /* a note outside the sampled range is not worth stopping for */ }
-    }
-    scheduledMs = Math.max(scheduledMs, until);
-
-    if (cur >= durationMs) stop(true);
-  }
+  /* ---------- transport ---------- */
 
   async function play() {
-    await Tone.start();
-    await initAudio();
     document.dispatchEvent(new CustomEvent("demo:play", { detail: "shared-prompt" }));
-    playing = true;
-    startedAt = Tone.now();
-    scheduledMs = offsetMs;
-    el.play.innerHTML = "&#10073;&#10073;";
-    el.play.setAttribute("aria-label", "Pause");
+    if (voice.position >= durationMs) voice.position = 0;
+    const a = data.artists[active];
+    await voice.play(clipId(a), a.notes);
+    setPlayButton(true);
+    voice.warm(data.artists.map(clipId));   // so later swaps are instant
   }
 
-  function stop(reachedEnd = false) {
-    if (playing) offsetMs = reachedEnd ? durationMs : nowMs();
-    playing = false;
-    if (sampler) sampler.releaseAll();
-    el.play.innerHTML = "&#9654;";
-    el.play.setAttribute("aria-label", "Play");
+  function stop() {
+    voice.stop();
+    setPlayButton(false);
   }
 
   function seekTo(ms) {
-    const wasPlaying = playing;
-    if (wasPlaying) stop();
-    offsetMs = clamp(ms, 0, durationMs);
-    if (wasPlaying) play();
+    voice.seek(clamp(ms, 0, durationMs));
     draw();
   }
 
@@ -124,12 +81,12 @@
     // the music, and rescale the timeline to the take they are now hearing.
     durationMs = a.duration_ms;
     el.seek.max = String(durationMs);
-    const at = nowMs();
-    if (at >= durationMs) {          // this take is already over by that point
+    voice.setEnd(durationMs);
+    if (voice.nowMs() >= durationMs) {   // this take is already over by that point
       stop();
-      offsetMs = durationMs;
-    } else if (playing) {
-      scheduledMs = at;
+      voice.position = durationMs;
+    } else {
+      voice.switchTo(clipId(a), a.notes);
     }
     draw();
   }
@@ -137,8 +94,6 @@
   /* ---------- drawing ---------- */
 
   const roll = makeRoll(el.canvas);
-
-  function resize() { roll.resize(); }
 
   function draw() {
     if (!data) return;
@@ -148,7 +103,7 @@
         { notes: a.notes.slice(0, 4 * data.shared_notes), color: COLOR.prompt },
         { notes: a.notes.slice(4 * data.shared_notes), color: COLOR.gen },
       ],
-      nowMs: nowMs(),
+      nowMs: voice.nowMs(),
       windowMs: WINDOW_MS,
       playheadFrac: PLAYHEAD_FRAC,
       branchMs: data.branch_ms,
@@ -158,7 +113,7 @@
 
   function frame() {
     draw();
-    const cur = nowMs();
+    const cur = voice.nowMs();
     el.time.textContent = `${fmt(cur)} / ${fmt(durationMs)}`;
     if (document.activeElement !== el.seek) el.seek.value = String(Math.round(cur));
     requestAnimationFrame(frame);
@@ -166,17 +121,17 @@
 
   /* ---------- wiring ---------- */
 
-  el.play.addEventListener("click", () => (playing ? stop() : play()));
+  el.play.addEventListener("click", () => (voice.playing ? stop() : play()));
   el.restart.addEventListener("click", () => seekTo(0));
   el.seek.addEventListener("input", (e) => seekTo(Number(e.target.value)));
-  window.addEventListener("resize", () => { resize(); draw(); });
+  window.addEventListener("resize", () => { roll.resize(); draw(); });
   document.addEventListener("demo:play", (e) => {
-    if (e.detail !== "shared-prompt" && playing) stop();
+    if (e.detail !== "shared-prompt" && voice.playing) stop();
   });
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && e.target === document.body) {
       e.preventDefault();
-      playing ? stop() : play();
+      voice.playing ? stop() : play();
     }
   });
 
@@ -194,13 +149,10 @@
         b.addEventListener("click", () => setArtist(i));
         el.artists.appendChild(b);
       });
-      resize();
+      roll.resize();
       setArtist(Math.max(0, data.artists.findIndex((a) => a.name === "Art Tatum")));
       el.status.textContent = "";
       requestAnimationFrame(frame);
-      // Audio runs on a timer, not the animation frame: hidden tabs stop
-      // painting, and playback must not stop with them.
-      setInterval(pump, 50);
     })
     .catch((err) => {
       el.status.textContent = "Could not load the performance data.";

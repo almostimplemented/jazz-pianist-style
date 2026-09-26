@@ -8,8 +8,6 @@
   "use strict";
 
   const DATA_URL = "data/characteristic.json";
-  const LOOKAHEAD_VISIBLE_MS = 150;
-  const LOOKAHEAD_HIDDEN_MS = 3000;
 
   const el = (id) => document.getElementById(id);
   const nodes = {
@@ -32,14 +30,24 @@
   };
 
   let tracks = [], active = 0;
-  let sampler = null, playingClip = null, startedAt = 0, scheduledMs = 0;
+  let playingClip = null;
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const signed = (z) => (z >= 0 ? "+" : "−") + Math.abs(z).toFixed(1);
   const track = () => tracks[active];
   const notesOf = (c) => track()[`${c.which}_notes`];
   const durOf = (c) => track()[`${c.which}_duration_ms`];
-  const nowMs = () => (playingClip ? (Tone.now() - startedAt) * 1000 : 0);
+  const nowMs = () => (playingClip ? voice.nowMs() : 0);
+  const clipId = (c) => `rg__${clipSlug(track().artist)}__${c.which}`;
+
+  function setPlayButton(c, on) {
+    c.play.innerHTML = on ? "&#10073;&#10073;" : "&#9654;";
+    c.play.setAttribute("aria-label", on ? "Pause" : "Play");
+  }
+  const voice = makeVoice({
+    onStatus: (s) => { nodes.status.textContent = s; },
+    onEnded: () => { if (playingClip) setPlayButton(playingClip, false); playingClip = null; },
+  });
 
   /* ---------- curve ---------- */
 
@@ -181,49 +189,21 @@
     }
   }
 
-  function pump() {
-    if (!playingClip || !sampler) return;
-    const cur = nowMs();
-    const until = cur + (document.hidden ? LOOKAHEAD_HIDDEN_MS : LOOKAHEAD_VISIBLE_MS);
-    const t0 = Tone.now();
-    const notes = notesOf(playingClip);
-    for (let i = 0; i < notes.length; i += 4) {
-      const start = notes[i];
-      if (start < scheduledMs) continue;
-      if (start >= until) break;
-      try {
-        sampler.triggerAttackRelease(midiToNote(notes[i + 2]),
-          Math.max(0.05, notes[i + 1] / 1000),
-          t0 + Math.max(0, (start - cur) / 1000),
-          clamp(notes[i + 3] / 127, 0.05, 1));
-      } catch (e) { /* out-of-range note */ }
-    }
-    scheduledMs = Math.max(scheduledMs, until);
-    if (cur >= durOf(playingClip) + 400) stop();
-  }
-
   async function play(c) {
-    await Tone.start();
-    if (!sampler) {
-      nodes.status.textContent = "Loading piano samples…";
-      sampler = await getSampler();
-      nodes.status.textContent = "";
-    }
     document.dispatchEvent(new CustomEvent("demo:play", { detail: "regions" }));
     stop();
+    voice.position = 0;
+    voice.setEnd(durOf(c));
     playingClip = c;
-    startedAt = Tone.now();
-    scheduledMs = 0;
-    c.play.innerHTML = "&#10073;&#10073;";
-    c.play.setAttribute("aria-label", "Pause");
+    setPlayButton(c, true);
+    await voice.play(clipId(c), notesOf(c));
   }
 
   function stop() {
+    voice.stop();
     if (!playingClip) return;
-    playingClip.play.innerHTML = "&#9654;";
-    playingClip.play.setAttribute("aria-label", "Play");
+    setPlayButton(playingClip, false);
     playingClip = null;
-    if (sampler) sampler.releaseAll();
   }
 
   /* ---------- selection ---------- */
@@ -270,7 +250,6 @@
       });
       sizeCurve();
       select(Math.max(0, tracks.findIndex((t) => t.artist === "Art Tatum")));
-      setInterval(pump, 50);
       (function frame() {
         if (playingClip) { drawClips(); drawCurve(); }
         requestAnimationFrame(frame);
