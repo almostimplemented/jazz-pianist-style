@@ -44,10 +44,6 @@
     const s = Math.max(0, Math.floor(ms / 1000));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   };
-  const midiToNote = (p) => {
-    const n = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-    return n[p % 12] + (Math.floor(p / 12) - 1);
-  };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const pct = (a) => `${Math.round(a * 100)}%`;
   const take = () => items[active].takes[takeIdx];
@@ -56,16 +52,7 @@
   async function initAudio() {
     if (sampler) return;
     nodes.status.textContent = "Loading piano samples…";
-    const urls = {};
-    for (const oct of [1, 2, 3, 4, 5, 6, 7]) for (const p of ["A", "C", "D#", "F#"]) {
-      urls[p + oct] = p.replace("#", "s") + oct + ".mp3";
-    }
-    urls["A0"] = "A0.mp3"; urls["C8"] = "C8.mp3";
-    sampler = new Tone.Sampler({
-      urls, baseUrl: "https://tonejs.github.io/audio/salamander/", release: 1.2,
-    }).toDestination();
-    sampler.volume.value = -4;
-    await Tone.loaded();
+    sampler = await getSampler();
     nodes.status.textContent = "";
   }
 

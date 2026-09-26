@@ -3,6 +3,8 @@
  * makeRoll(canvas) returns { draw(state) } where state is:
  *   streams: [{ notes: flat [start_ms,dur_ms,pitch,vel], color }]
  *   nowMs, windowMs, playheadFrac
+ *   fromMs (optional): pin the view's left edge; the playhead then moves
+ *   pitchRange (optional): [lo, hi] MIDI pitches to show instead of the full keyboard
  *   branchMs (optional): dashed marker with a label
  */
 (() => {
@@ -31,16 +33,18 @@
       const w = canvas.clientWidth, h = canvas.clientHeight;
       const windowMs = state.windowMs || 8000;
       const frac = state.playheadFrac ?? 0.28;
-      const from = state.nowMs - windowMs * frac;
+      const from = state.fromMs ?? state.nowMs - windowMs * frac;
       const to = from + windowMs;
-      const yOf = (p) => h - ((p - LO) / (HI - LO)) * (h - 8) - 4;
+      const [lo, hi] = state.pitchRange || [LO, HI];
+      const yOf = (p) => h - ((p - lo) / (hi - lo)) * (h - 8) - 4;
       const xOf = (ms) => ((ms - from) / windowMs) * w;
 
       ctx.clearRect(0, 0, w, h);
 
       ctx.strokeStyle = COLOR.line;
       ctx.lineWidth = 1;
-      for (let p = 24; p <= HI; p += 12) {
+      for (let p = 24; p <= hi; p += 12) {
+        if (p < lo) continue;
         const y = Math.round(yOf(p)) + 0.5;
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
       }
@@ -55,11 +59,13 @@
           ctx.restore();
           ctx.fillStyle = COLOR.dim;
           ctx.font = "11px ui-monospace, monospace";
-          ctx.fillText(state.branchLabel || "", bx + 6, 14);
+          const label = state.branchLabel || "";
+          const tw = ctx.measureText(label).width;
+          ctx.fillText(label, bx + 6 + tw > w ? bx - 6 - tw : bx + 6, 14);
         }
       }
 
-      const noteH = Math.max(2.5, (h - 8) / (HI - LO) * 1.6);
+      const noteH = Math.max(2.5, Math.min(6, (h - 8) / (hi - lo) * 1.6));
       for (const stream of state.streams) {
         const notes = stream.notes;
         for (let i = 0; i < notes.length; i += 4) {
@@ -87,7 +93,7 @@
       }
       ctx.globalAlpha = 1;
 
-      const px = Math.round(w * frac) + 0.5;
+      const px = Math.round(xOf(state.nowMs)) + 0.5;
       ctx.strokeStyle = "#fff";
       ctx.globalAlpha = 0.8;
       ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();

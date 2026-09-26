@@ -21,17 +21,25 @@ import numpy as np
 import pretty_midi
 
 
+LEAD_MS = 250  # excerpts start mid-performance; start each one promptly
+
+
 def pack_notes(path: Path):
     if not path.exists():
         return [], 0
     pm = pretty_midi.PrettyMIDI(str(path))
-    flat, end = [], 0.0
-    for inst in pm.instruments:
-        for n in sorted(inst.notes, key=lambda x: (x.start, x.pitch)):
-            flat += [int(round(n.start * 1000)), int(round((n.end - n.start) * 1000)),
-                     int(n.pitch), int(n.velocity)]
-            end = max(end, n.end)
-    return flat, int(round(end * 1000))
+    notes = sorted((n for inst in pm.instruments for n in inst.notes),
+                   key=lambda x: (x.start, x.pitch))
+    if not notes:
+        return [], 0
+    shift = notes[0].start * 1000 - LEAD_MS
+    flat, end = [], 0
+    for n in notes:
+        start = int(round(n.start * 1000 - shift))
+        dur = int(round((n.end - n.start) * 1000))
+        flat += [start, dur, int(n.pitch), int(n.velocity)]
+        end = max(end, start + dur)
+    return flat, end
 
 
 def parse_args():
@@ -41,6 +49,11 @@ def parse_args():
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--max-curve-points", type=int, default=400,
                     help="downsample long curves to keep the payload small")
+    ap.add_argument("--one-per-artist", action="store_true",
+                    help="keep each artist's track with the highest peak")
+    ap.add_argument("--prefer", action="append", default=[],
+                    metavar="ARTIST=TITLE_SUBSTRING",
+                    help="pin an artist's track instead (repeatable)")
     return ap.parse_args()
 
 
@@ -77,7 +90,16 @@ def main():
         if "peak_notes" in entry and "trough_notes" in entry:
             tracks.append(entry)
 
-    tracks.sort(key=lambda e: -e["peak_z"])
+    if args.one_per_artist:
+        prefer = dict(p.split("=", 1) for p in args.prefer)
+        best = {}
+        for e in tracks:
+            want = prefer.get(e["artist"])
+            rank = (want is not None and want.lower() in e["title"].lower(), e["peak_z"])
+            if e["artist"] not in best or rank > best[e["artist"]][0]:
+                best[e["artist"]] = (rank, e)
+        tracks = [e for _, e in best.values()]
+    tracks.sort(key=lambda e: e["artist"])
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps({"stats": summary["stats"], "tracks": tracks},
                                    separators=(",", ":")))

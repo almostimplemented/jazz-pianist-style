@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Learning Jazz Pianist Style with Cross-Attention Conditioning</title>
-<meta name="description" content="Companion page for the ISMIR 2026 paper: listen to one prompt continued in the style of twelve jazz pianists, and swap between them as it plays.">
+<meta name="description" content="Companion page for the ISMIR 2026 paper: a music model continuing performances in the style of twelve jazz pianists, a blindfold test, and the moments where each pianist's style is most recognizable.">
 <link rel="preconnect" href="https://tonejs.github.io">
 <style>
   :root {
@@ -16,6 +16,7 @@
     --accent: #e0a33e;
     --accent-dim: #8a6524;
     --prompt: #6f8fa8;
+    --miss: #7d5a72;
     --radius: 10px;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   }
@@ -92,7 +93,7 @@
   /* scored continuations */
   .showcase { background: var(--bg-raised); border: 1px solid var(--line);
               border-radius: var(--radius); padding: 1.25rem; }
-  .sc-list { display: grid; grid-template-columns: repeat(6, 1fr);
+  .sc-list { display: grid; grid-template-columns: repeat(4, 1fr);
              gap: .35rem; margin-bottom: 1.1rem; }
   .sc-list button { background: none; border: 1px solid var(--line); color: var(--ink-dim);
                     border-radius: 6px; padding: .4rem .6rem; cursor: pointer; text-align: left;
@@ -138,7 +139,24 @@
   .sc-list button.missed { color: #b58aa6; }
   .verdict.right { border-color: var(--accent); background: #1e1809; }
   .verdict.wrong { border-color: #6c4a60; background: #1d1319; }
-  @media (max-width: 44rem) { .sc-list { grid-template-columns: repeat(3, 1fr); } }
+  .regions { background: var(--bg-raised); border: 1px solid var(--line);
+             border-radius: var(--radius); padding: 1.25rem; }
+  #rg-curve { height: 150px; margin: .8rem 0 1rem; }
+  .rg-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .rg-clip { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+             gap: .4rem .7rem; align-items: center; }
+  .rg-cap { grid-column: 1 / -1; font-size: .92rem; }
+  .rg-cap .z { font-family: var(--mono); font-size: .75rem; color: var(--ink-dim); margin-left: .5rem; }
+  .rg-roll { grid-column: 2; grid-row: 2; height: 150px; }
+  button.play.small { width: 2.4rem; height: 2.4rem; font-size: .9rem; grid-column: 1; grid-row: 2; }
+  #rg-note:empty, #rg-status:empty { display: none; }
+  @media (max-width: 44rem) { .rg-pair { grid-template-columns: 1fr; } }
+  @media (max-width: 44rem) {
+    .sc-list { grid-template-columns: repeat(2, 1fr); }
+    .sc-score { text-align: left; }
+    .sc-score .big { display: inline; margin-right: .5rem; }
+    .sc-score .cap br { display: none; }
+  }
   #cont-status:empty, #reveal:empty { display: none; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -152,6 +170,7 @@
   <div class="links">
     <a href="#demo">Listen</a>
     <a href="#scored">Scored takes</a>
+    <a href="#regions">Where style lives</a>
     <a href="#about">About</a>
     <a href="https://github.com/almostimplemented/jazz-pianist-style">Code</a>
     <a href="https://github.com/almostimplemented/PiJAMA">PiJAMA dataset</a>
@@ -181,11 +200,11 @@
 <section id="demo">
   <h2>One prompt, twelve pianists</h2>
   <p class="lede">
-    The first few bars are a human performance of &ldquo;Ain&rsquo;t Misbehavin&rsquo;&rdquo;.
-    Everything after the marked branch point is generated, conditioned on one of
-    twelve jazz pianists &mdash; twelve takes of the same opening. Switch between
-    them as it plays and you stay at the same moment in the music, hearing how
-    each pianist carries the tune on.
+    The opening bars of &ldquo;Ain&rsquo;t Misbehavin&rsquo;&rdquo; are played by
+    one of us (Drew). Everything after the dashed line is generated: twelve
+    takes of the same opening, each conditioned on a different pianist. Switch
+    between them as it plays and you stay at the same moment in the music,
+    hearing how each pianist carries the tune on.
   </p>
 
   <div class="player">
@@ -258,6 +277,37 @@
 </section>
 
 
+<section id="regions" hidden>
+  <h2>Where the style lives</h2>
+  <p class="lede">
+    The classifier can also point at moments. On a real performance it is
+    near-certain almost everywhere, so instead we ask where it is <em>even
+    more sure than usual</em>: its margin for the true pianist over the
+    runner-up, compared with its own average across that performance. Below,
+    for one held-out recording per pianist, that curve over the whole piece
+    and fifteen seconds from its highest and lowest points.
+  </p>
+  <div class="regions">
+    <div class="sc-list" id="rg-list" role="group" aria-label="Choose a pianist"></div>
+    <div class="sc-label" id="rg-title"></div>
+    <canvas id="rg-curve" aria-label="How characteristic each part of the performance is"></canvas>
+    <div class="rg-pair">
+      <div class="rg-clip">
+        <div class="rg-cap" id="rg-peak-cap"></div>
+        <canvas class="rg-roll" id="rg-peak-roll" aria-label="Piano roll of the most characteristic passage"></canvas>
+        <button class="play small" id="rg-peak-play" aria-label="Play">&#9654;</button>
+      </div>
+      <div class="rg-clip">
+        <div class="rg-cap" id="rg-trough-cap"></div>
+        <canvas class="rg-roll" id="rg-trough-roll" aria-label="Piano roll of the least characteristic passage"></canvas>
+        <button class="play small" id="rg-trough-play" aria-label="Play">&#9654;</button>
+      </div>
+    </div>
+    <p class="hint" id="rg-note"></p>
+    <p class="status" id="rg-status"></p>
+  </div>
+</section>
+
 <section class="about" id="about">
   <h2>About these examples</h2>
   <p>
@@ -312,8 +362,10 @@
 </div>
 
 <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
-<script src="roll.js?v=5"></script>
-<script src="app.js?v=5"></script>
-<script src="showcase.js?v=5"></script>
+<script src="audio.js?v=11"></script>
+<script src="roll.js?v=11"></script>
+<script src="app.js?v=11"></script>
+<script src="showcase.js?v=11"></script>
+<script src="regions.js?v=11"></script>
 </body>
 </html>
