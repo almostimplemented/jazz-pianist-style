@@ -179,11 +179,16 @@
 
 <section class="intro">
   <p>
-    Jazz listeners can often name a pianist within a few bars, and jazz
-    pianists learn by imitating the greats &mdash; Dick Hyman wrote a whole
-    book of etudes, each in the style of a different master. We asked whether
-    a music model can learn those styles too: not just recognize who is
-    playing, but play in their manner.
+    In 1994 Dick Hyman published <em>In the Styles of&hellip; The Great Jazz
+    Pianists</em>: fifteen original &eacute;tudes, each written in the manner of
+    one master, from Scott Joplin to Bill Evans. Rather than transcribing their
+    solos, Hyman composed new music that carries their signatures &mdash;
+    Tatum&rsquo;s &ldquo;rapid runs in both hands,&rdquo; Garner&rsquo;s
+    &ldquo;strumming, guitar-like left hand,&rdquo; Peterson&rsquo;s
+    &ldquo;tremolos and glissandi.&rdquo; That book is the inspiration for this
+    project. Can a model learn to do what Hyman did: not just recognize who is
+    playing, but play in their manner? Tatum, Garner, and Peterson are among
+    the twelve pianists we study &mdash; and so is Hyman himself.
   </p>
   <p>
     We fine-tune Aria, a transformer pretrained on piano MIDI, on solo
@@ -336,7 +341,8 @@
   <p>
     <b>The scores come from a classifier,</b> not from listeners. It is a
     strong one (98.8% of held-out songs), but it has habits: many of its
-    mistakes on generated music land on Dick Hyman. A listening study is the natural next step.
+    mistakes on generated music land on Dick Hyman &mdash; fitting, perhaps,
+    for a pianist who made a career of playing in everyone else&rsquo;s style. A listening study is the natural next step.
   </p>
   <p>
     This is a research tool for studying pianist style, in the spirit of
