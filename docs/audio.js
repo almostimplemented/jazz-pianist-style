@@ -10,7 +10,8 @@
 (() => {
   "use strict";
 
-  const AUDIO_BASE = window.AUDIO_BASE || "audio/";
+  const AUDIO_BASE = window.AUDIO_BASE || "audio/";           // where the clip files live
+  const AUDIO_INDEX = window.AUDIO_INDEX || "audio/index.json"; // small, kept with the page
   const LOOKAHEAD_VISIBLE_MS = 150;   // responsive while watching
   const LOOKAHEAD_HIDDEN_MS = 3000;   // background tabs clamp timers to ~1 s
 
@@ -46,7 +47,7 @@
   let index = null;
   let audioBroken = false;   // a file failed to play: stay on the sampler from then on
   const elements = new Map();
-  const indexReady = fetch(AUDIO_BASE + "index.json", { cache: "no-cache" })
+  const indexReady = fetch(AUDIO_INDEX, { cache: "no-cache" })
     .then((r) => (r.ok ? r.json() : null))
     .then((idx) => { index = idx; return idx; })
     .catch(() => null);

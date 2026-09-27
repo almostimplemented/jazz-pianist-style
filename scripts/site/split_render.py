@@ -29,13 +29,14 @@ PEAK_DBFS = -1.0
 
 
 def to_float(x: np.ndarray) -> np.ndarray:
+    """float32 keeps an hour-plus bounce to a few GB in memory."""
     if x.dtype == np.int16:
-        return x / 32768.0
+        return x.astype(np.float32) / 32768.0
     if x.dtype == np.int32:
-        return x / 2147483648.0
+        return x.astype(np.float32) / 2147483648.0
     if x.dtype == np.uint8:
-        return (x - 128) / 128.0
-    return x.astype(np.float64)
+        return (x.astype(np.float32) - 128) / 128.0
+    return x.astype(np.float32)
 
 
 def onset_near(mono: np.ndarray, sr: int, expect_s: float, window_s: float = 1.5):

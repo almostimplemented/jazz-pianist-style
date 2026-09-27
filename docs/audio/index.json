@@ -1,0 +1,302 @@
+{
+ "am__Abdullah_Ibrahim": {
+  "file": "am__Abdullah_Ibrahim.m4a",
+  "duration_ms": 108500,
+  "audio_ms": 111000
+ },
+ "am__Andy_Laverne": {
+  "file": "am__Andy_Laverne.m4a",
+  "duration_ms": 118370,
+  "audio_ms": 120870
+ },
+ "am__Art_Tatum": {
+  "file": "am__Art_Tatum.m4a",
+  "duration_ms": 109740,
+  "audio_ms": 112240
+ },
+ "am__Cedar_Walton": {
+  "file": "am__Cedar_Walton.m4a",
+  "duration_ms": 165180,
+  "audio_ms": 167680
+ },
+ "am__Dave_McKenna": {
+  "file": "am__Dave_McKenna.m4a",
+  "duration_ms": 119180,
+  "audio_ms": 121680
+ },
+ "am__Dick_Hyman": {
+  "file": "am__Dick_Hyman.m4a",
+  "duration_ms": 139660,
+  "audio_ms": 142160
+ },
+ "am__Erroll_Garner": {
+  "file": "am__Erroll_Garner.m4a",
+  "duration_ms": 86740,
+  "audio_ms": 89240
+ },
+ "am__George_Cables": {
+  "file": "am__George_Cables.m4a",
+  "duration_ms": 155000,
+  "audio_ms": 157500
+ },
+ "am__Hank_Jones": {
+  "file": "am__Hank_Jones.m4a",
+  "duration_ms": 124290,
+  "audio_ms": 126790
+ },
+ "am__Horace_Parlan": {
+  "file": "am__Horace_Parlan.m4a",
+  "duration_ms": 118460,
+  "audio_ms": 120960
+ },
+ "am__Oscar_Peterson": {
+  "file": "am__Oscar_Peterson.m4a",
+  "duration_ms": 100010,
+  "audio_ms": 102510
+ },
+ "am__Tete_Montoliu": {
+  "file": "am__Tete_Montoliu.m4a",
+  "duration_ms": 122650,
+  "audio_ms": 125150
+ },
+ "sc__Abdullah_Ibrahim__take1": {
+  "file": "sc__Abdullah_Ibrahim__take1.m4a",
+  "duration_ms": 196610,
+  "audio_ms": 199110
+ },
+ "sc__Abdullah_Ibrahim__take2": {
+  "file": "sc__Abdullah_Ibrahim__take2.m4a",
+  "duration_ms": 133250,
+  "audio_ms": 135750
+ },
+ "sc__Andy_Laverne__take1": {
+  "file": "sc__Andy_Laverne__take1.m4a",
+  "duration_ms": 170990,
+  "audio_ms": 173490
+ },
+ "sc__Andy_Laverne__take2": {
+  "file": "sc__Andy_Laverne__take2.m4a",
+  "duration_ms": 75110,
+  "audio_ms": 77610
+ },
+ "sc__Art_Tatum__take1": {
+  "file": "sc__Art_Tatum__take1.m4a",
+  "duration_ms": 109590,
+  "audio_ms": 112090
+ },
+ "sc__Art_Tatum__take2": {
+  "file": "sc__Art_Tatum__take2.m4a",
+  "duration_ms": 126340,
+  "audio_ms": 128840
+ },
+ "sc__Cedar_Walton__take1": {
+  "file": "sc__Cedar_Walton__take1.m4a",
+  "duration_ms": 167340,
+  "audio_ms": 169840
+ },
+ "sc__Cedar_Walton__take2": {
+  "file": "sc__Cedar_Walton__take2.m4a",
+  "duration_ms": 171300,
+  "audio_ms": 173800
+ },
+ "sc__Dave_McKenna__take1": {
+  "file": "sc__Dave_McKenna__take1.m4a",
+  "duration_ms": 121460,
+  "audio_ms": 123960
+ },
+ "sc__Dave_McKenna__take2": {
+  "file": "sc__Dave_McKenna__take2.m4a",
+  "duration_ms": 101200,
+  "audio_ms": 103700
+ },
+ "sc__Dick_Hyman__take1": {
+  "file": "sc__Dick_Hyman__take1.m4a",
+  "duration_ms": 113800,
+  "audio_ms": 116300
+ },
+ "sc__Dick_Hyman__take2": {
+  "file": "sc__Dick_Hyman__take2.m4a",
+  "duration_ms": 103750,
+  "audio_ms": 106250
+ },
+ "sc__Erroll_Garner__take1": {
+  "file": "sc__Erroll_Garner__take1.m4a",
+  "duration_ms": 87160,
+  "audio_ms": 89660
+ },
+ "sc__Erroll_Garner__take2": {
+  "file": "sc__Erroll_Garner__take2.m4a",
+  "duration_ms": 97410,
+  "audio_ms": 99910
+ },
+ "sc__George_Cables__take1": {
+  "file": "sc__George_Cables__take1.m4a",
+  "duration_ms": 117280,
+  "audio_ms": 119780
+ },
+ "sc__George_Cables__take2": {
+  "file": "sc__George_Cables__take2.m4a",
+  "duration_ms": 136170,
+  "audio_ms": 138670
+ },
+ "sc__Hank_Jones__take1": {
+  "file": "sc__Hank_Jones__take1.m4a",
+  "duration_ms": 86900,
+  "audio_ms": 89400
+ },
+ "sc__Hank_Jones__take2": {
+  "file": "sc__Hank_Jones__take2.m4a",
+  "duration_ms": 147960,
+  "audio_ms": 150460
+ },
+ "sc__Horace_Parlan__take1": {
+  "file": "sc__Horace_Parlan__take1.m4a",
+  "duration_ms": 269220,
+  "audio_ms": 271720
+ },
+ "sc__Horace_Parlan__take2": {
+  "file": "sc__Horace_Parlan__take2.m4a",
+  "duration_ms": 151820,
+  "audio_ms": 154320
+ },
+ "sc__Oscar_Peterson__take1": {
+  "file": "sc__Oscar_Peterson__take1.m4a",
+  "duration_ms": 99260,
+  "audio_ms": 101760
+ },
+ "sc__Oscar_Peterson__take2": {
+  "file": "sc__Oscar_Peterson__take2.m4a",
+  "duration_ms": 45960,
+  "audio_ms": 48460
+ },
+ "sc__Tete_Montoliu__take1": {
+  "file": "sc__Tete_Montoliu__take1.m4a",
+  "duration_ms": 169020,
+  "audio_ms": 171520
+ },
+ "sc__Tete_Montoliu__take2": {
+  "file": "sc__Tete_Montoliu__take2.m4a",
+  "duration_ms": 203860,
+  "audio_ms": 206360
+ },
+ "rg__Abdullah_Ibrahim__peak": {
+  "file": "rg__Abdullah_Ibrahim__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Abdullah_Ibrahim__trough": {
+  "file": "rg__Abdullah_Ibrahim__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Andy_Laverne__peak": {
+  "file": "rg__Andy_Laverne__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Andy_Laverne__trough": {
+  "file": "rg__Andy_Laverne__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Art_Tatum__peak": {
+  "file": "rg__Art_Tatum__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Art_Tatum__trough": {
+  "file": "rg__Art_Tatum__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Cedar_Walton__peak": {
+  "file": "rg__Cedar_Walton__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Cedar_Walton__trough": {
+  "file": "rg__Cedar_Walton__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Dave_McKenna__peak": {
+  "file": "rg__Dave_McKenna__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Dave_McKenna__trough": {
+  "file": "rg__Dave_McKenna__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Dick_Hyman__peak": {
+  "file": "rg__Dick_Hyman__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17512
+ },
+ "rg__Dick_Hyman__trough": {
+  "file": "rg__Dick_Hyman__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Erroll_Garner__peak": {
+  "file": "rg__Erroll_Garner__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17510
+ },
+ "rg__Erroll_Garner__trough": {
+  "file": "rg__Erroll_Garner__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__George_Cables__peak": {
+  "file": "rg__George_Cables__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__George_Cables__trough": {
+  "file": "rg__George_Cables__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Hank_Jones__peak": {
+  "file": "rg__Hank_Jones__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Hank_Jones__trough": {
+  "file": "rg__Hank_Jones__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Horace_Parlan__peak": {
+  "file": "rg__Horace_Parlan__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Horace_Parlan__trough": {
+  "file": "rg__Horace_Parlan__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Oscar_Peterson__peak": {
+  "file": "rg__Oscar_Peterson__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Oscar_Peterson__trough": {
+  "file": "rg__Oscar_Peterson__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ },
+ "rg__Tete_Montoliu__peak": {
+  "file": "rg__Tete_Montoliu__peak.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17511
+ },
+ "rg__Tete_Montoliu__trough": {
+  "file": "rg__Tete_Montoliu__trough.m4a",
+  "duration_ms": 15000,
+  "audio_ms": 17500
+ }
+}
