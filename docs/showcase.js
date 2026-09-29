@@ -20,12 +20,12 @@
     label: el("cont-label"),
     takes: el("cont-takes"),
     strip: el("cont-strip"),
-    score: el("cont-score"),
     blind: el("blind-toggle"),
     guess: el("guess-panel"),
     guessBtns: el("guess-buttons"),
     reveal: el("reveal"),
     status: el("cont-status"),
+    context: el("cont-context"),
   };
 
   const css = getComputedStyle(document.documentElement);
@@ -81,13 +81,22 @@
     render();
   }
 
+  let cells = [], lit = "";
   function renderStrip() {
     const t = take();
     nodes.strip.innerHTML = "";
+    cells = [];
+    lit = "";
     for (const w of t.windows) {
       const cell = document.createElement("div");
       cell.className = "cell " + (w.correct ? "hit" : "miss");
-      cell.style.opacity = String(0.35 + 0.65 * w.confidence);
+      cells.push(cell);
+      if (w.start_ms != null) {
+        cell.addEventListener("click", () => {
+          if (voice.playing) voice.seek(w.start_ms);
+          else { voice.position = w.start_ms; startPlayback(); }
+        });
+      }
       cell.title = blind
         ? `window at token ${w.position}`
         : `token ${w.position}: heard ${w.pred} (${Math.round(w.confidence * 100)}%)`;
@@ -95,10 +104,23 @@
     }
   }
 
+  // One quiet line: where the two playable takes sit among everything we
+  // scored for this pianist, and the paper's own average for them.
+  function renderContext(hidden) {
+    const it = items[active];
+    if (hidden || !it.pool) { nodes.context.innerHTML = ""; return; }
+    const vals = it.pool.map((c) => c.agreement);
+    nodes.context.innerHTML =
+      `The best two of ${it.pool.length} generations we scored for ${it.artist}, which ranged ` +
+      `${pct(Math.min(...vals))}&ndash;${pct(Math.max(...vals))}. ` +
+      `In the paper&rsquo;s evaluation, ${it.artist} averaged <b>${pct(it.paper_agreement)}</b>.`;
+  }
+
   function render() {
     const it = items[active];
     const t = take();
     const hidden = blind && guessed === null;
+    renderContext(hidden);
 
     nodes.label.innerHTML = hidden
       ? `<span class="masked">mystery pianist</span>`
@@ -109,16 +131,13 @@
     if (!blind && it.takes.length > 1) {
       it.takes.forEach((tk, i) => {
         const b = document.createElement("button");
-        b.textContent = `Take ${i + 1} · ${pct(tk.agreement)}`;
+        b.innerHTML = `Take ${i + 1}<span class="sc">${pct(tk.agreement)} agreement</span>`;
         b.setAttribute("aria-pressed", String(i === takeIdx));
         b.addEventListener("click", () => { if (i !== takeIdx) select(active, i); });
         nodes.takes.appendChild(b);
       });
     }
 
-    nodes.score.innerHTML = hidden ? "" :
-      `<span class="big">${pct(t.agreement)}</span>` +
-      `<span class="cap">classifier agreement<br>across ${t.windows.length} windows</span>`;
     nodes.strip.classList.toggle("masked", hidden);
     renderStrip();
     nodes.guess.hidden = !blind || guessed !== null;
@@ -209,6 +228,14 @@
           nodes.time.textContent = `${fmt(cur)} / ${fmt(t.duration_ms)}`;
           if (document.activeElement !== nodes.seek)
             nodes.seek.value = String(Math.round(cur));
+          // outline the windows that contain the moment being played
+          const now = t.windows.map((w, i) =>
+            w.start_ms != null && w.start_ms <= cur && cur <= w.end_ms ? i : -1).filter((i) => i >= 0).join(",");
+          if (now !== lit) {
+            const on = new Set(now ? now.split(",").map(Number) : []);
+            cells.forEach((c, i) => c.classList.toggle("now", on.has(i)));
+            lit = now;
+          }
           roll.draw({
             streams: [
               { notes: t.prompt_notes, color: COLOR.prompt },

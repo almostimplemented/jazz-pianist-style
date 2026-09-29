@@ -1,0 +1,17 @@
+{
+ "description": "Mean sliding-window agreement of conditioned continuations with the true pianist, per pianist, at prompt length 256 on the validation split (paper, Section 5, Figure 6).",
+ "agreement": {
+  "Hank Jones": 0.96,
+  "Dick Hyman": 0.957,
+  "Tete Montoliu": 0.72,
+  "Abdullah Ibrahim": 0.707,
+  "Erroll Garner": 0.675,
+  "Horace Parlan": 0.66,
+  "Art Tatum": 0.659,
+  "Oscar Peterson": 0.636,
+  "Dave McKenna": 0.488,
+  "George Cables": 0.415,
+  "Andy Laverne": 0.348,
+  "Cedar Walton": 0.291
+ }
+}

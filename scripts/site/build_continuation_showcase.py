@@ -68,6 +68,9 @@ def parse_args():
                     help="how many generations to score per pianist")
     ap.add_argument("--takes-per-artist", type=int, default=2,
                     help="how many of the top-scoring candidates to keep")
+    ap.add_argument("--paper-agreement", type=Path,
+                    default=Path("data/paper_per_artist_agreement.json"),
+                    help="per-pianist agreement from the paper, shown for context")
     ap.add_argument("--min-windows", type=int, default=5,
                     help="a take must span at least this many classification "
                          "windows (rules out early-EOS stubs)")
@@ -104,6 +107,25 @@ def notes_from_ids(ids, tokenizer, offset_ms=0):
                      int(round((n.end - n.start) * 1000)), int(n.pitch), int(n.velocity)]
             end = max(end, n.end)
     return flat, int(round(end * 1000)) + offset_ms
+
+
+def token_times(ids, tokenizer):
+    """Performance time (ms) at each token, as the detokenizer lays notes out.
+
+    Time tokens advance the clock by abs_time_step_ms; each onset token sets
+    the time of its note. A token's time is the onset of the note it belongs
+    to (or the running clock before the first onset).
+    """
+    toks = ids_to_tokens(list(ids), tokenizer)
+    times, base, now = [], 0, 0
+    for tok in toks:
+        if tok == tokenizer.time_tok:
+            base += tokenizer.abs_time_step_ms
+            now = max(now, base)
+        elif isinstance(tok, tuple) and tok[0] == "onset":
+            now = base + int(tok[1])
+        times.append(now)
+    return times
 
 
 @torch.no_grad()
@@ -175,6 +197,10 @@ def main():
     logger.info(f"{sum(len(v) for v in by_artist.values())} generations on file; "
                 f"{len(artists)} pianists; scoring on {device}")
 
+    paper_agreement = {}
+    if args.paper_agreement and args.paper_agreement.exists():
+        paper_agreement = json.loads(args.paper_agreement.read_text())["agreement"]
+
     cache = {}
     if args.score_cache and args.score_cache.exists():
         cache = json.loads(args.score_cache.read_text())
@@ -225,12 +251,16 @@ def main():
             src = provenance.get(str(sample_idx), {})
             prompt_notes, branch = [], 0
             seq = prompt_of.get(sample_idx)
+            offset = 0              # continuation token j sits at combined index offset + j
+            clock = token_times(list(ids), tokenizer)
             if seq is not None:
                 prompt_ids = tokens_to_ids(seq, tokenizer)[:args.prompt_length]
                 # decode prompt and prompt+continuation as one stream so the
                 # join keeps continuous timing, then split at the branch
                 _, branch = notes_from_ids(prompt_ids, tokenizer)
                 combined, _ = notes_from_ids(prompt_ids + list(ids), tokenizer)
+                offset = len(prompt_ids)
+                clock = token_times(prompt_ids + list(ids), tokenizer)
                 prompt_notes, notes = [], []
                 for i in range(0, len(combined), 4):
                     (prompt_notes if combined[i] < branch else notes).extend(combined[i:i+4])
@@ -252,15 +282,29 @@ def main():
                             arr[i] -= delta
                     branch = max(branch - delta, 0)
                     duration -= delta
+                    clock = [t - delta for t in clock]
+            # Where each classification window sits in the music, so the page
+            # can show which windows cover the moment being played.
+            last = len(clock) - 1
+            timed = [dict(w, start_ms=clock[min(offset + w["position"], last)],
+                          end_ms=clock[min(offset + w["position"] + CLASSIFY_WINDOW - 1, last)])
+                     for w in windows]
             takes.append({
                 "sample_idx": sample_idx,
                 "prompt_title": Path(src.get("track_id", "")).stem,
                 "prompt_notes": prompt_notes, "branch_ms": branch,
                 "notes": notes, "duration_ms": duration,
-                "agreement": agreement, "windows": windows,
+                "agreement": agreement, "windows": timed,
                 "generated_tokens": len(ids),
             })
-        items.append({"artist": artist, "takes": takes})
+        # Every scored candidate, so the page can show where the playable
+        # takes sit in the pool rather than only the best of it.
+        kept_idx = {c[1] for c in keep}
+        pool = sorted(({"agreement": round(c[0], 4), "windows": len(c[4]),
+                        "shown": c[1] in kept_idx} for c in eligible),
+                      key=lambda x: x["agreement"])
+        items.append({"artist": artist, "takes": takes, "pool": pool,
+                      "paper_agreement": paper_agreement.get(artist)})
         logger.info(f"{artist}: kept {[f'{t[0]:.0%}' for t in keep]} "
                     f"(candidates {sorted(round(c[0], 2) for c in candidates)})")
 
@@ -272,7 +316,8 @@ def main():
         "config": {"source": str(args.generations),
                    "classify_window": CLASSIFY_WINDOW, "window_stride": WINDOW_STRIDE,
                    "candidates_per_artist": args.candidates_per_artist,
-                   "selection": "top scoring distinct samples", "seed": args.seed},
+                   "selection": "top scoring distinct samples", "seed": args.seed,
+                   "pool": f"all scored candidates with at least {args.min_windows} windows"},
         "note_format": ["start_ms", "duration_ms", "pitch", "velocity"],
         "items": items,
     }, separators=(",", ":")))

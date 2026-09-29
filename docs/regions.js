@@ -30,14 +30,14 @@
   };
 
   let tracks = [], active = 0;
-  let playingClip = null;
+  let currentClip = null;   // the excerpt the voice holds, playing or paused
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const signed = (z) => (z >= 0 ? "+" : "−") + Math.abs(z).toFixed(1);
   const track = () => tracks[active];
   const notesOf = (c) => track()[`${c.which}_notes`];
   const durOf = (c) => track()[`${c.which}_duration_ms`];
-  const nowMs = () => (playingClip ? voice.nowMs() : 0);
+  const nowMs = () => (currentClip ? voice.nowMs() : 0);
   const clipId = (c) => `rg__${clipSlug(track().artist)}__${c.which}`;
 
   function setPlayButton(c, on) {
@@ -46,7 +46,7 @@
   }
   const voice = makeVoice({
     onStatus: (s) => { nodes.status.textContent = s; },
-    onEnded: () => { if (playingClip) setPlayButton(playingClip, false); playingClip = null; },
+    onEnded: () => { if (currentClip) setPlayButton(currentClip, false); },
   });
 
   /* ---------- curve ---------- */
@@ -89,7 +89,7 @@
     // the two excerpt regions, shaded as in the paper's figure
     for (const c of clips) {
       const x0 = xOf(t[`${c.which}_start_s`]), x1 = xOf(t[`${c.which}_start_s`] + EXCERPT_S());
-      cctx.globalAlpha = playingClip === c ? 0.22 : 0.1;
+      cctx.globalAlpha = currentClip === c ? 0.22 : 0.1;
       cctx.fillStyle = c.which === "peak" ? COLOR.peak : COLOR.trough;
       cctx.fillRect(x0, 0, x1 - x0, h - padB + 4);
     }
@@ -151,8 +151,8 @@
     }
 
     // live playhead while an excerpt plays
-    if (playingClip) {
-      const sec = t[`${playingClip.which}_start_s`] + nowMs() / 1000;
+    if (currentClip) {
+      const sec = t[`${currentClip.which}_start_s`] + nowMs() / 1000;
       const x = xOf(sec), y = yOf(zAt(t, sec));
       cctx.strokeStyle = "#fff";
       cctx.globalAlpha = 0.7;
@@ -178,7 +178,7 @@
   }
   function drawClips() {
     for (const c of clips) {
-      const playingThis = playingClip === c;
+      const playingThis = currentClip === c;
       rolls.get(c).draw({
         streams: [{ notes: notesOf(c), color: c.which === "peak" ? COLOR.peak : "#b58aa6" }],
         nowMs: playingThis ? nowMs() : 0,
@@ -189,27 +189,86 @@
     }
   }
 
-  async function play(c) {
+  // Play an excerpt: resume where it was paused, or start from fromMs.
+  async function play(c, fromMs = null) {
     document.dispatchEvent(new CustomEvent("demo:play", { detail: "regions" }));
-    stop();
-    voice.position = 0;
+    voice.stop();
+    if (currentClip && currentClip !== c) setPlayButton(currentClip, false);
     voice.setEnd(durOf(c));
-    playingClip = c;
+    if (fromMs != null) voice.position = fromMs;
+    else if (currentClip !== c || voice.position >= durOf(c)) voice.position = 0;
+    currentClip = c;
     setPlayButton(c, true);
     await voice.play(clipId(c), notesOf(c));
   }
 
-  function stop() {
+  function pause() {
     voice.stop();
-    if (!playingClip) return;
-    setPlayButton(playingClip, false);
-    playingClip = null;
+    if (currentClip) setPlayButton(currentClip, false);
   }
+
+  function reset() {
+    pause();
+    currentClip = null;
+    voice.position = 0;
+  }
+
+  // Jump within an excerpt: seek if it is already playing, else start it there.
+  function seekClip(c, ms) {
+    ms = clamp(ms, 0, durOf(c));
+    if (currentClip === c && voice.playing) voice.seek(ms);
+    else play(c, ms);
+    drawCurve(); drawClips();
+  }
+
+  /* ---------- click and drag to seek ---------- */
+
+  // The shaded region under a point on the curve, and the time within it.
+  function curveHit(ev) {
+    const t = track();
+    const r = nodes.curve.getBoundingClientRect();
+    const sec = ((ev.clientX - r.left - 1) / (r.width - 2)) * Math.max(1, t.duration_s);
+    for (const c of clips) {
+      const s0 = t[`${c.which}_start_s`];
+      if (sec >= s0 && sec <= s0 + EXCERPT_S()) return { c, ms: (sec - s0) * 1000 };
+    }
+    return null;
+  }
+
+  function draggable(canvas, hit) {
+    let drag = null;   // the excerpt being scrubbed
+    canvas.addEventListener("pointerdown", (ev) => {
+      const h = hit(ev);
+      if (!h) return;
+      drag = h.c;
+      canvas.setPointerCapture(ev.pointerId);
+      seekClip(h.c, h.ms);
+    });
+    canvas.addEventListener("pointermove", (ev) => {
+      if (drag) {
+        const h = hit(ev, drag);
+        if (h) seekClip(drag, h.ms);
+      } else {
+        canvas.style.cursor = hit(ev) ? "pointer" : "default";
+      }
+    });
+    const end = () => { drag = null; };
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+  }
+
+  // While dragging, keep scrubbing the same excerpt even past its edges
+  draggable(nodes.curve, (ev, lock) => {
+    if (!lock) return curveHit(ev);
+    const t = track(), r = nodes.curve.getBoundingClientRect();
+    const sec = ((ev.clientX - r.left - 1) / (r.width - 2)) * Math.max(1, t.duration_s);
+    return { c: lock, ms: (sec - t[`${lock.which}_start_s`]) * 1000 };
+  });
 
   /* ---------- selection ---------- */
 
   function select(idx) {
-    stop();
+    reset();
     active = idx;
     const t = track();
     [...nodes.list.children].forEach((b, i) => b.setAttribute("aria-pressed", String(i === idx)));
@@ -230,10 +289,14 @@
   }
 
   for (const c of clips) {
-    c.play.addEventListener("click", () => (playingClip === c ? stop() : play(c)));
+    c.play.addEventListener("click", () => (currentClip === c && voice.playing ? pause() : play(c)));
     rolls.set(c, makeRoll(c.canvas));
+    draggable(c.canvas, (ev) => {
+      const r = c.canvas.getBoundingClientRect();
+      return { c, ms: ((ev.clientX - r.left) / r.width) * durOf(c) };
+    });
   }
-  document.addEventListener("demo:play", (e) => { if (e.detail !== "regions") stop(); });
+  document.addEventListener("demo:play", (e) => { if (e.detail !== "regions") pause(); });
   window.addEventListener("resize", () => { if (tracks.length) { sizeCurve(); drawCurve(); drawClips(); } });
 
   fetch(DATA_URL, { cache: "no-cache" })
@@ -251,11 +314,14 @@
       sizeCurve();
       select(Math.max(0, tracks.findIndex((t) => t.artist === "Art Tatum")));
       (function frame() {
-        if (playingClip) { drawClips(); drawCurve(); }
+        if (voice.playing) { drawClips(); drawCurve(); }
         requestAnimationFrame(frame);
       })();
-      let lastLit = null;  // repaint once more when playback stops
-      setInterval(() => { if (lastLit !== playingClip) { lastLit = playingClip; drawCurve(); } }, 100);
+      let lastState = "";  // repaint once more when playback stops or changes clip
+      setInterval(() => {
+        const st = `${currentClip && currentClip.which}:${voice.playing}`;
+        if (st !== lastState) { lastState = st; drawCurve(); drawClips(); }
+      }, 100);
     })
     .catch((e) => console.error(e));  // the section stays hidden
 })();

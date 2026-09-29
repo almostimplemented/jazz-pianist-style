@@ -109,31 +109,34 @@
   .sc-list button:hover { border-color: var(--accent-dim); color: var(--ink); }
   .sc-list button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent);
                                          background: #221a0d; }
-  .sc-takes { display: flex; gap: .35rem; margin-top: .55rem; }
+  .sc-head { margin-bottom: .8rem; }
+  .sc-takes { display: flex; gap: .5rem; margin-top: .7rem; flex-wrap: wrap; }
   .sc-takes button { background: none; border: 1px solid var(--line); color: var(--ink-dim);
-                     border-radius: 999px; padding: .22rem .65rem; cursor: pointer;
-                     font-family: var(--mono); font-size: .7rem; }
+                     border-radius: 8px; padding: .4rem .8rem; cursor: pointer;
+                     font-family: inherit; font-size: .9rem; }
+  .sc-takes button .sc { font-family: var(--mono); font-size: .75rem; margin-left: .4rem; opacity: .8; }
   .sc-takes button:hover { border-color: var(--accent-dim); color: var(--ink); }
-  .sc-takes button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
-  .sc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
-             flex-wrap: wrap; margin-bottom: .8rem; }
+  .sc-takes button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: #221a0d; }
+  .sc-context { font-size: .85rem; color: var(--ink-dim); margin: .6rem 0 0; }
+  .sc-context:empty { display: none; }
   .sc-label b { font-size: 1.1rem; }
   .sc-label .sub { display: block; color: var(--ink-dim); font-size: .85rem; margin-top: .15rem; }
   .sc-label .masked { color: var(--ink-dim); font-style: italic; }
-  .sc-score { text-align: right; }
-  .sc-score .big { display: block; font-size: 1.6rem; color: var(--accent); line-height: 1.1; }
-  .sc-score .cap { font-family: var(--mono); font-size: .65rem; color: var(--ink-dim); }
   .sc-roll { width: 100%; height: 180px; display: block; border-radius: 6px;
              background: #0d0b09; margin-bottom: .6rem; }
   .sc-strip { display: flex; gap: 2px; height: 2.2rem; margin-bottom: .4rem; }
   .sc-strip .cell { flex: 1; border-radius: 2px; background: var(--accent); }
   .sc-strip .cell.miss { background: #7d5a72; }
-  .sc-strip.masked .cell { background: var(--line) !important; opacity: 1 !important; }
+  .sc-strip .cell { cursor: pointer; transition: transform .12s; }
+  .sc-strip .cell.now { transform: translateY(-4px); box-shadow: 0 0 0 1.5px var(--ink); }
+  .sc-strip { padding-top: 5px; }
+  .sc-strip.masked .cell { background: var(--line) !important; }
   .sc-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-family: var(--mono);
                font-size: .68rem; color: var(--ink-dim); margin-bottom: .8rem; }
   .sw { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px;
         background: var(--accent); vertical-align: -1px; margin-right: .2rem; }
   .sw.miss { background: #7d5a72; }
+  .sw.now { background: none; box-shadow: inset 0 0 0 1.5px var(--ink); }
   .guess { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
   .guess button { background: none; border: 1px solid var(--line); color: var(--ink-dim);
                   border-radius: 999px; padding: .3rem .7rem; cursor: pointer;
@@ -149,7 +152,9 @@
   .verdict.wrong { border-color: #6c4a60; background: #1d1319; }
   .regions { background: var(--bg-raised); border: 1px solid var(--line);
              border-radius: var(--radius); padding: 1.25rem; }
-  #rg-curve { height: 170px; margin: .8rem 0 1rem; }
+  #rg-curve { height: 170px; margin: .8rem 0 .3rem; touch-action: none; }
+  .rg-hint { font-size: .8rem; margin: 0 0 1rem; }
+  .rg-roll { touch-action: none; cursor: pointer; }
   .rg-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   .rg-clip { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
              gap: .4rem .7rem; align-items: center; }
@@ -193,9 +198,6 @@
   @media (max-width: 44rem) { .rg-pair { grid-template-columns: 1fr; } }
   @media (max-width: 44rem) {
     .sc-list { grid-template-columns: repeat(2, 1fr); }
-    .sc-score { text-align: left; }
-    .sc-score .big { display: inline; margin-right: .5rem; }
-    .sc-score .cap br { display: none; }
   }
   #cont-status:empty, #reveal:empty { display: none; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -288,26 +290,25 @@
     pianist instead continues a few bars of <em>their own</em> playing. The
     strip under each take shows what our classifier heard as it slid along
     the continuation, one cell per window of about 300 notes: gold where it
-    named the intended pianist, mauve where it named someone else. Or switch
-    on the blindfold and guess for yourself.
+    named the intended pianist, mauve where it named someone else. The two takes per pianist are the best of
+    eight we scored; the line under them says how the rest did. Or switch on
+    the blindfold and guess for yourself.
   </p>
 
   <div class="showcase">
     <div class="sc-list" id="cont-list" role="group" aria-label="Choose a pianist"></div>
     <div class="sc-main">
       <div class="sc-head">
-        <div>
-          <div class="sc-label" id="cont-label"></div>
-          <div class="sc-takes" id="cont-takes" role="group" aria-label="Choose a take"></div>
-        </div>
-        <div class="sc-score" id="cont-score"></div>
+        <div class="sc-label" id="cont-label"></div>
+        <div class="sc-takes" id="cont-takes" role="group" aria-label="Choose a take"></div>
+        <p class="sc-context" id="cont-context"></p>
       </div>
       <canvas id="cont-roll" class="sc-roll" aria-label="Piano roll of the take"></canvas>
       <div class="sc-strip" id="cont-strip" aria-label="Classifier verdict per window"></div>
       <div class="sc-legend">
         <span><i class="sw hit"></i> classifier names the intended pianist</span>
         <span><i class="sw miss"></i> names someone else</span>
-        <span>fainter = less confident</span>
+        <span><i class="sw now"></i> windows that include what you hear now</span>
       </div>
       <div class="transport">
         <button class="play" id="cont-play" aria-label="Play">&#9654;</button>
@@ -342,6 +343,7 @@
     <div class="sc-list" id="rg-list" role="group" aria-label="Choose a pianist"></div>
     <div class="sc-label" id="rg-title"></div>
     <canvas id="rg-curve" aria-label="How characteristic each part of the performance is"></canvas>
+    <p class="hint rg-hint">Click or drag inside a shaded region, or on either piano roll, to play from that point.</p>
     <div class="rg-pair">
       <div class="rg-clip">
         <div class="rg-cap" id="rg-peak-cap"></div>
@@ -541,10 +543,10 @@
     : "https://github.com/almostimplemented/jazz-pianist-style/releases/download/audio-v1/";
 </script>
 <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
-<script src="audio.js?v=17"></script>
-<script src="roll.js?v=17"></script>
-<script src="app.js?v=17"></script>
-<script src="showcase.js?v=17"></script>
-<script src="regions.js?v=17"></script>
+<script src="audio.js?v=23"></script>
+<script src="roll.js?v=23"></script>
+<script src="app.js?v=23"></script>
+<script src="showcase.js?v=23"></script>
+<script src="regions.js?v=23"></script>
 </body>
 </html>
