@@ -19,8 +19,8 @@ Example:
     python scripts/agreement_eval.py \
         --checkpoint-dir checkpoints/generator_best \
         --classifier checkpoints/pijama12_classifier.pt \
-        --val-jsonl data/eval/pijama12_test_4096.jsonl \
-        --artist-map data/eval/artist_to_id.json \
+        --val-jsonl data/pijama12_4096/val.jsonl \
+        --artist-map data/pijama12_4096/artist_to_id.json \
         --prompt-length 256 --out results/agreement_P256.json
 """
 from __future__ import annotations
@@ -135,9 +135,13 @@ def main():
             if artist not in artist_to_id:
                 continue
             ids = tokens_to_ids(rec["seq"], tokenizer)
-            if len(ids) < args.prompt_length + CLASSIFY_WINDOW:
+            # Need a full prompt plus a little room; how much music follows is
+            # up to the generator, and the windows are counted on its output.
+            if len(ids) < args.prompt_length + 64:
                 continue
+            meta = rec.get("metadata", {})
             samples.append({"artist": artist, "artist_id": artist_to_id[artist],
+                            "track_id": meta.get("track_id") or meta.get("midi_filepath"),
                             "prompt_ids": ids[:args.prompt_length]})
             if args.max_samples and len(samples) >= args.max_samples:
                 break
@@ -190,6 +194,7 @@ def main():
                                 "correct_prompt": pred == s["artist_id"],
                                 "correct_cond": pred == s["cond_id"]})
             results.append({"artist": s["artist"], "artist_id": s["artist_id"],
+                            "track_id": s["track_id"],
                             "cond_artist": id_to_artist[s["cond_id"]],
                             "generated_tokens": len(generated), "windows": windows})
         logger.info(f"{min(start + bs, len(samples))}/{len(samples)} prompts done")
@@ -212,8 +217,10 @@ def main():
               "agreement_cond_artist": pos_stats[p]["cond"] / pos_stats[p]["total"],
               "n_windows": pos_stats[p]["total"]} for p in positions]
     mean_agreement = (sum(c["agreement_prompt_artist"] for c in curve) / len(curve)) if curve else 0.0
-    per_artist_mean = {a: sum(d[p]["correct"] for p in d) / max(sum(d[p]["total"] for p in d), 1)
-                       for a, d in per_artist.items()}
+    # Per artist, the same statistic as the headline: agreement at each window
+    # position (pooled over that artist's prompts), averaged over positions.
+    per_artist_mean = {a: sum(d[p]["correct"] / d[p]["total"] for p in d) / len(d)
+                       for a, d in per_artist.items() if d}
 
     out = {
         "config": {"mode": args.mode, "prompt_length": args.prompt_length,

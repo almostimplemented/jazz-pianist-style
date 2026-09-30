@@ -76,9 +76,10 @@ def parse_args():
     ap.add_argument("--ca-dropout", type=float, default=0.1)
     ap.add_argument("--gate-init", type=float, default=0.1)
     ap.add_argument("--embedding-dropout", type=float, default=0.3)
-    ap.add_argument("--conditioning-dropout", type=float, default=0.3,
+    ap.add_argument("--conditioning-dropout", type=float, default=0.0,
                     help="Per-sample probability of zeroing the artist context "
-                         "during training (unconditional branch for CFG-style use)")
+                         "during training (unconditional branch for CFG-style use). "
+                         "The paper's model was trained without it.")
     ap.add_argument("--model-name", default="medium", help="Aria config name")
     ap.add_argument("--model-config-json", type=Path, default=None,
                     help="JSON file overriding the model config (tiny/debug runs)")

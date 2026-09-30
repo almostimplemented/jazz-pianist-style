@@ -43,9 +43,10 @@ def parse_args():
     ap.add_argument("--split-column", default="song_split")
     ap.add_argument("--splits", nargs="*", default=["train", "val", "test"])
     ap.add_argument("--max-seq-len", type=int, default=4096)
-    ap.add_argument("--trim-to-performance-bounds", action="store_true",
-                    help="Trim to performance_start_sec/performance_end_sec "
-                         "(drops applause and announcements on live recordings)")
+    ap.add_argument("--no-trim", dest="trim_to_performance_bounds", action="store_false",
+                    help="Keep whole recordings instead of trimming to "
+                         "performance_start_sec/performance_end_sec. The paper's data is "
+                         "trimmed (drops applause and announcements on live recordings).")
     ap.add_argument("--write-artist-map", action="store_true", default=True,
                     help="Also write artist_to_id.json over the artists present")
     return ap.parse_args()

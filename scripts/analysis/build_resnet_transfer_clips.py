@@ -1,38 +1,52 @@
 #!/usr/bin/env python3
 """Build MIDI + clip indexes for the from-scratch ResNet transfer experiment.
 
-Arms (Cheston ResNet-50 architecture + recipe, OUR data and splits):
-  A (real):  PiJAMA-12 real train/val tracks, reconstructed from the 4096-token
-             chunk JSONLs (concat chunks per track_id in chunk_idx order).
-  B (synth): clean-room synthetic generations (chunk 0 dropped, generation-level
-             val split), reconstructed per generation from the clean-room JSONLs.
-  test:      real PiJAMA-12 test tracks (shared by both arms), from test.jsonl.
+The ResNet-50 arms use the architecture and recipe of Cheston et al.'s Deep
+Pianist Identification on our data and splits:
+  real:  PiJAMA-12 real train/val tracks, reconstructed from the 4096-token
+         JSONLs (chunks concatenated per track in chunk order)
+  synth: generated continuations only, reconstructed per generation
+  test:  the real PiJAMA-12 test tracks, shared by both arms
 
-Output: scratch/camera_ready/resnet_transfer/
-  midi/<split>/<n>.mid  +  <split>_index.csv (file, label, group, duration_s)
-Clips are cut at dataset time (non-overlapping 30 s starts from duration).
+For each split this writes midi/<split>/<n>.mid and <split>_index.csv
+(file, label, group, duration_s); train_resnet_transfer.py cuts 30 s clips
+from these at load time. Point it at --out-dir with RESNET_DATA_DIR.
+
+Example:
+    python scripts/analysis/build_resnet_transfer_clips.py \
+        --real-train data/pijama12_4096/train.jsonl \
+        --real-val data/pijama12_4096/val.jsonl \
+        --real-test data/pijama12_1024/test.jsonl \
+        --synth-train data/synthetic/train.jsonl --synth-val data/synthetic/val.jsonl \
+        --out-dir data/resnet_transfer
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 from collections import defaultdict
 from pathlib import Path
 
 from ariautils.tokenizer import AbsTokenizer
+from pretty_midi import PrettyMIDI
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-OUT = REPO_ROOT / "scratch" / "camera_ready" / "resnet_transfer"
-
-SOURCES = {
-    # split name -> (jsonl path, group key fn, sort key fn)
-    "real_train": (REPO_ROOT / ".cache/paper/pijama12_train_4096.jsonl", "track_id", "chunk_idx"),
-    "real_val": (REPO_ROOT / ".cache/paper/pijama12_val_4096.jsonl", "track_id", "chunk_idx"),
-    "real_test": (REPO_ROOT / "scratch/characteristic_regions/test.jsonl", "track_id", "chunk_idx"),
-    "synth_train": (REPO_ROOT / "scratch/camera_ready/cleanroom_data/train.jsonl", "generation_idx", "chunk_idx"),
-    "synth_val": (REPO_ROOT / "scratch/camera_ready/cleanroom_data/val.jsonl", "generation_idx", "chunk_idx"),
-}
 PREFIX = ("prefix", "instrument", "piano")
+
+
+def parse_args():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--real-train", type=Path)
+    ap.add_argument("--real-val", type=Path)
+    ap.add_argument("--real-test", type=Path)
+    ap.add_argument("--synth-train", type=Path, help="generated continuations, 1024-token chunks")
+    ap.add_argument("--synth-val", type=Path)
+    ap.add_argument("--out-dir", type=Path, default=Path("data/resnet_transfer"))
+    args = ap.parse_args()
+    if not any([args.real_train, args.real_val, args.real_test, args.synth_train, args.synth_val]):
+        ap.error("give at least one input split")
+    return args
 
 
 def to_tuples(seq):
@@ -40,15 +54,27 @@ def to_tuples(seq):
 
 
 def main():
+    args = parse_args()
+    out = args.out_dir
+    # split name -> (jsonl, key grouping chunks into one piece, key ordering them)
+    sources = {
+        "real_train": (args.real_train, "track_id", "chunk_idx"),
+        "real_val": (args.real_val, "track_id", "chunk_idx"),
+        "real_test": (args.real_test, "track_id", "chunk_idx"),
+        "synth_train": (args.synth_train, "generation_idx", "chunk_idx"),
+        "synth_val": (args.synth_val, "generation_idx", "chunk_idx"),
+    }
     tokenizer = AbsTokenizer()
-    for split, (path, group_key, sort_key) in SOURCES.items():
+    for split, (path, group_key, sort_key) in sources.items():
+        if path is None:
+            continue
         groups = defaultdict(list)
         with open(path) as f:
             for line in f:
                 rec = json.loads(line)
                 m = rec["metadata"]
                 groups[m[group_key]].append((m.get(sort_key, 0), m["artist"].replace("_", " "), rec["seq"]))
-        mididir = OUT / "midi" / split
+        mididir = out / "midi" / split
         mididir.mkdir(parents=True, exist_ok=True)
         rows, skipped = [], 0
         for i, (gid, chunks) in enumerate(sorted(groups.items(), key=lambda kv: str(kv[0]))):
@@ -63,14 +89,12 @@ def main():
                 midi = tokenizer.detokenize(tokens).to_midi()
                 dst = mididir / f"{i:05d}.mid"
                 midi.save(str(dst))
-                # duration from pretty_midi for a consistent reading
-                from pretty_midi import PrettyMIDI
                 dur = PrettyMIDI(str(dst)).get_end_time()
-                rows.append({"file": str(dst.relative_to(OUT)), "label": artist,
+                rows.append({"file": str(dst.relative_to(out)), "label": artist,
                              "group": str(gid), "duration_s": round(dur, 2)})
-            except Exception as e:
+            except Exception:
                 skipped += 1
-        with open(OUT / f"{split}_index.csv", "w", newline="") as f:
+        with open(out / f"{split}_index.csv", "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=["file", "label", "group", "duration_s"])
             w.writeheader()
             w.writerows(rows)
