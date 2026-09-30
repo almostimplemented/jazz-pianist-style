@@ -127,11 +127,17 @@
       await indexReady;
       clipId = id; notes = clipNotes;
       if (hasAudio(id)) {
+        onStatus?.("Loading audio…");
         try {
           el = await startAudio(id);
           mode = "audio"; playing = true;
+          onStatus?.("");
           return;
         } catch (err) {
+          onStatus?.("");
+          // Refused by the browser (no user gesture) or interrupted by a
+          // pause: the audio is fine, so don't give up on it.
+          if (err && (err.name === "NotAllowedError" || err.name === "AbortError")) throw err;
           console.warn("pre-rendered audio unavailable, using the sampler", id, err);
           audioBroken = true;
         }
@@ -167,6 +173,9 @@
         el = next; clipId = id; notes = clipNotes;
         try { await startAt(next, pos); }
         catch (err) {
+          if (err && (err.name === "NotAllowedError" || err.name === "AbortError")) {
+            el = prev; return;
+          }
           console.warn("pre-rendered audio unavailable, using the sampler", id, err);
           audioBroken = true; el = prev; stop(); offsetMs = pos;
           await play(id, clipNotes);

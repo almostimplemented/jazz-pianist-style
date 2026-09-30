@@ -200,7 +200,11 @@
     else if (currentClip !== c || voice.position >= durOf(c)) voice.position = 0;
     currentClip = c;
     setPlayButton(c, true);
-    await voice.play(clipId(c), notesOf(c));
+    try {
+      await voice.play(clipId(c), notesOf(c));
+    } catch (err) {
+      setPlayButton(c, false);   // the browser refused to start playback
+    }
   }
 
   function pause() {

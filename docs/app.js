@@ -54,7 +54,11 @@
     document.dispatchEvent(new CustomEvent("demo:play", { detail: "shared-prompt" }));
     if (voice.position >= durationMs) voice.position = 0;
     const a = data.artists[active];
-    await voice.play(clipId(a), a.notes);
+    try {
+      await voice.play(clipId(a), a.notes);
+    } catch (err) {
+      return;                    // the browser refused to start playback
+    }
     setPlayButton(true);
     voice.warm(data.artists.map(clipId));   // so later swaps are instant
   }

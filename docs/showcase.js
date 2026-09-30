@@ -59,7 +59,11 @@
   async function startPlayback() {
     document.dispatchEvent(new CustomEvent("demo:play", { detail: "showcase" }));
     const t = take();
-    await voice.play(clipId(), t.prompt_notes.concat(t.notes));
+    try {
+      await voice.play(clipId(), t.prompt_notes.concat(t.notes));
+    } catch (err) {
+      return;                    // the browser refused to start playback
+    }
     setPlayButton(true);
   }
   function stopPlayback() {
