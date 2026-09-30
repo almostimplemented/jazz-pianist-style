@@ -15,6 +15,10 @@ Conditioning modes:
     mismatch      conditioned on a different artist (agreement measured
                   against both the prompt artist and the conditioning artist)
 
+Baselines without cross-attention (Table 2): pass --base-checkpoint instead of
+--checkpoint-dir, with pretrained Aria's model-gen.safetensors or the
+fine-tuned baseline's model.safetensors. They see the prompt only.
+
 Example:
     python scripts/agreement_eval.py \
         --checkpoint-dir checkpoints/generator_best \
@@ -57,7 +61,12 @@ WINDOW_STRIDE = 128
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    ap.add_argument("--checkpoint-dir", type=Path, required=True)
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--checkpoint-dir", type=Path,
+                     help="conditioned generator (model + artist_embeddings safetensors)")
+    src.add_argument("--base-checkpoint", type=Path,
+                     help="a model without cross-attention: pretrained Aria or the "
+                          "fine-tuned baseline (.safetensors)")
     ap.add_argument("--classifier", type=Path, required=True)
     ap.add_argument("--val-jsonl", type=Path, required=True,
                     help="Held-out sequences (4096-token JSONL)")
@@ -83,7 +92,31 @@ def parse_args():
     return ap.parse_args()
 
 
+def load_base_model(args, device):
+    """Aria without cross-attention, KV-cached; generates from the prompt alone.
+
+    Uses this repo's inference model with no cross-attention layers: the same
+    network as Aria's own inference model (identical weights and keys), but
+    with a KV cache that works on any device, not only CUDA.
+    """
+    from llama_pijama.models import CrossAttentionInferenceLM
+    cfg = load_model_config(args.model_name)
+    model_config = ModelConfig(**cfg)
+    model_config.set_vocab_size(AbsTokenizer().vocab_size)
+    model = CrossAttentionInferenceLM(model_config=model_config,
+                                      cross_attention_config={"layers": [], "dropout": 0.0})
+    state = {k.replace("_orig_mod.", ""): v for k, v in load_file(args.base_checkpoint).items()}
+    model.load_state_dict(state, strict=True)
+    model = model.to(device).eval()
+    model.setup_cache(batch_size=args.batch_size,
+                      max_seq_len=args.prompt_length + args.max_continuation + 64,
+                      dtype=torch.float32)
+    return model
+
+
 def load_generator(args, num_artists, device):
+    if args.base_checkpoint:
+        return load_base_model(args, device), None
     cfg = load_model_config(args.model_name)
     cfg.setdefault("resid_dropout", 0.0)
     cfg["grad_checkpoint"] = False
@@ -167,9 +200,11 @@ def main():
         padded = batch + [batch[0]] * pad  # KV cache is fixed-size
         input_ids = torch.tensor([s["prompt_ids"] for s in padded],
                                  dtype=torch.long, device=device)
-        ctx, ctx_mask = emb(torch.tensor([s["cond_id"] for s in padded], device=device))
-        if args.mode == "ablation":
-            ctx = torch.zeros_like(ctx)
+        ctx, ctx_mask = None, None
+        if emb is not None:
+            ctx, ctx_mask = emb(torch.tensor([s["cond_id"] for s in padded], device=device))
+            if args.mode == "ablation":
+                ctx = torch.zeros_like(ctx)
 
         with torch.no_grad():
             if bs == 1:
@@ -223,7 +258,8 @@ def main():
                        for a, d in per_artist.items() if d}
 
     out = {
-        "config": {"mode": args.mode, "prompt_length": args.prompt_length,
+        "config": {"mode": "baseline" if args.base_checkpoint else args.mode,
+                   "checkpoint": str(args.base_checkpoint or args.checkpoint_dir), "prompt_length": args.prompt_length,
                    "classify_window": CLASSIFY_WINDOW, "window_stride": WINDOW_STRIDE,
                    "max_continuation": args.max_continuation, "seed": args.seed,
                    "temperature": args.temperature, "top_k": args.top_k, "top_p": args.top_p,
