@@ -13,7 +13,7 @@ Chunk length selects the dataset variant: 4096 tokens for generation,
 
 Example:
     python scripts/build_dataset.py \
-        --midi-root ~/PiJAMA/data \
+        --midi-root ~/PiJAMA \
         --metadata-csv data/pijama12.csv \
         --out-dir data/pijama12_4096 --max-seq-len 4096
 """
@@ -37,7 +37,7 @@ def parse_args():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument("--midi-root", type=Path, required=True,
-                    help="Directory that `midi_filepath` values are relative to")
+                    help="The PiJAMA checkout; `midi_filepath` values (data/midi/...) are relative to it")
     ap.add_argument("--metadata-csv", type=Path, required=True)
     ap.add_argument("--out-dir", type=Path, required=True)
     ap.add_argument("--split-column", default="song_split")

@@ -210,7 +210,7 @@ def train(
     checkpoint_path: str | None = None,
     freeze_base: bool = False,
     use_pretrained: bool = True,
-    use_wandb: bool = True,
+    use_wandb: bool = False,
     balanced_loss: bool = True,
     use_augmentation: bool = True,
     augmentation_prob: float = 0.5,
