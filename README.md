@@ -29,14 +29,14 @@ Three models are on the Hugging Face Hub:
 
 | Repository | Contents |
 |---|---|
-| [`almostimplemented/jazz-pianist-style-generator`](https://huggingface.co/almostimplemented/jazz-pianist-style-generator) | The conditional generator: Aria-medium with gated cross-attention and 12 learned pianist embeddings |
-| [`almostimplemented/jazz-pianist-style-classifier`](https://huggingface.co/almostimplemented/jazz-pianist-style-classifier) | The PiJAMA-12 pianist classifier, the paper's measuring instrument |
-| [`almostimplemented/jazz-pianist-style-synthetic-classifier`](https://huggingface.co/almostimplemented/jazz-pianist-style-synthetic-classifier) | The classifier trained only on generated music |
+| [`drewbie/jazz-pianist-style-generator`](https://huggingface.co/drewbie/jazz-pianist-style-generator) | The conditional generator: Aria-medium with gated cross-attention and 12 learned pianist embeddings |
+| [`drewbie/jazz-pianist-style-classifier`](https://huggingface.co/drewbie/jazz-pianist-style-classifier) | The PiJAMA-12 pianist classifier, the paper's measuring instrument |
+| [`drewbie/jazz-pianist-style-synthetic-classifier`](https://huggingface.co/drewbie/jazz-pianist-style-synthetic-classifier) | The classifier trained only on generated music |
 
 ```bash
-hf download almostimplemented/jazz-pianist-style-generator --local-dir checkpoints/generator
-hf download almostimplemented/jazz-pianist-style-classifier --local-dir checkpoints/classifier
-hf download almostimplemented/jazz-pianist-style-synthetic-classifier --local-dir checkpoints/synthetic-classifier
+hf download drewbie/jazz-pianist-style-generator --local-dir checkpoints/generator
+hf download drewbie/jazz-pianist-style-classifier --local-dir checkpoints/classifier
+hf download drewbie/jazz-pianist-style-synthetic-classifier --local-dir checkpoints/synthetic-classifier
 ```
 
 ## Data
