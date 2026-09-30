@@ -106,6 +106,7 @@ def main():
                       "score": float(probs[j])} for j in top5_idx],
             "track_id": meta.get("track_id", ""),
             "title": meta.get("title", ""),
+            "logits": [round(float(v), 4) for v in results["logits"][i]],
         })
 
     out = {
@@ -118,6 +119,7 @@ def main():
                         if f"track_level_{m}" in track},
         "track_level_two_stage": two_stage,
         "per_sample": per_sample,
+        "artists": [id_to_artist[i] for i in range(len(id_to_artist))],
     }
     # metadata dicts are large and non-serializable-ish; summarize
     for level in ("clip_level", "track_level"):
