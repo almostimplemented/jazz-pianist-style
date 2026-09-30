@@ -313,7 +313,7 @@ def main():
         args.score_cache.write_text(json.dumps(cache))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps({
-        "config": {"source": str(args.generations),
+        "config": {"source": args.generations.name,
                    "classify_window": CLASSIFY_WINDOW, "window_stride": WINDOW_STRIDE,
                    "candidates_per_artist": args.candidates_per_artist,
                    "selection": "top scoring distinct samples", "seed": args.seed,
