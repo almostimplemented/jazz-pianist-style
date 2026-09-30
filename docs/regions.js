@@ -144,7 +144,8 @@
 
     // time axis
     cctx.fillStyle = COLOR.dim;
-    const step = span > 240 ? 60 : 30;
+    // label every 30 s, 60 s or 120 s, whichever keeps labels ~60 px apart
+    const step = [30, 60, 120, 300].find((st) => (st / span) * w >= 60) || 300;
     for (let sec = 0; sec <= span; sec += step) {
       const label = fmt(sec), tw = cctx.measureText(label).width;
       cctx.fillText(label, clamp(xOf(sec) - tw / 2, 1, w - tw - 1), h - 4);
