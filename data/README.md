@@ -53,6 +53,10 @@ Expected sizes:
 | 4096 tokens | 1,354 | 166 | 177 |
 | 1024 tokens | 4,427 | 551 | 591 |
 
+The paper's splits (1,383 / 175 / 177 at 4096 tokens), on which the released
+checkpoints were trained, also included 19 ensemble recordings that this CSV
+excludes; the test sets are identical.
+
 Splits are at the song level (the `song_split` column; 623 / 76 / 80 songs),
 so no performance appears in more than one split. Recordings are trimmed to
 the CSV's `performance_start_sec` / `performance_end_sec` by default, which
