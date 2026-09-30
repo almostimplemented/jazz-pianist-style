@@ -20,8 +20,39 @@ cd jazz-pianist-style
 uv sync          # or: pip install -e .
 ```
 
-Runs on CUDA, Apple Silicon (MPS), or CPU. Training the full generator needs a
-40GB GPU; everything else runs on a laptop.
+Runs on CUDA, Apple silicon (MPS), or CPU. Training needs a GPU; evaluation
+of the released checkpoints runs on a laptop.
+
+## Checkpoints
+
+Three models are on the Hugging Face Hub:
+
+| Repository | Contents |
+|---|---|
+| [`almostimplemented/jazz-pianist-style-generator`](https://huggingface.co/almostimplemented/jazz-pianist-style-generator) | The conditional generator: Aria-medium with gated cross-attention and 12 learned pianist embeddings |
+| [`almostimplemented/jazz-pianist-style-classifier`](https://huggingface.co/almostimplemented/jazz-pianist-style-classifier) | The PiJAMA-12 pianist classifier, the paper's measuring instrument |
+| [`almostimplemented/jazz-pianist-style-synthetic-classifier`](https://huggingface.co/almostimplemented/jazz-pianist-style-synthetic-classifier) | The classifier trained only on generated music |
+
+```bash
+hf download almostimplemented/jazz-pianist-style-generator --local-dir checkpoints/generator
+hf download almostimplemented/jazz-pianist-style-classifier --local-dir checkpoints/classifier
+hf download almostimplemented/jazz-pianist-style-synthetic-classifier --local-dir checkpoints/synthetic-classifier
+```
+
+## Data
+
+The commands below read tokenized splits built from the public
+[PiJAMA](https://github.com/almostimplemented/PiJAMA) dataset. Build them once:
+
+```bash
+python scripts/build_dataset.py --midi-root /path/to/PiJAMA \
+    --metadata-csv data/pijama12.csv --out-dir data/pijama12_4096 --max-seq-len 4096
+python scripts/build_dataset.py --midi-root /path/to/PiJAMA \
+    --metadata-csv data/pijama12.csv --out-dir data/pijama12_1024 --max-seq-len 1024
+```
+
+`data/README.md` has the details: split membership, trimming, and the
+expected sequence counts.
 
 ## Quickstart
 
@@ -29,22 +60,20 @@ Generate a continuation in the style of a pianist:
 
 ```bash
 python scripts/generate.py \
-    --checkpoint-dir checkpoints/generator_best \
-    --artist-map data/eval/artist_to_id.json \
+    --checkpoint-dir checkpoints/generator \
+    --artist-map data/pijama12_4096/artist_to_id.json \
     --artist "Art Tatum" --num-samples 2 --out-dir samples/
 ```
 
-Score a classifier on the real test split:
+Score the classifier on the real test split:
 
 ```bash
 python scripts/evaluate_classifier.py \
-    --checkpoint checkpoints/pijama12_classifier.pt \
+    --checkpoint checkpoints/classifier/best.pt \
     --test-jsonl data/pijama12_1024/test.jsonl \
     --artist-map data/pijama12_1024/artist_to_id.json \
-    --out results/eval.json
+    --out results/real_clf_eval.json
 ```
-
-See `data/README.md` for building the JSONL splits from PiJAMA.
 
 ## What is here
 
@@ -52,54 +81,71 @@ See `data/README.md` for building the JSONL splits from PiJAMA.
 |---|---|
 | `llama_pijama/models/` | Gated cross-attention adapter, artist embeddings, KV-cached inference |
 | `llama_pijama/tokenization/` | Aria tokenizer extended with artist tokens |
+| `llama_pijama/training/` | Datasets and the classifier training loop |
 | `llama_pijama/evaluation/` | Inference, chunk metrics, track aggregation |
 | `llama_pijama/analysis/` | Memorization and similarity checks |
 | `llama_pijama/external/cheston_dpi/` | Vendored ResNet-50 baseline (MIT, see below) |
-| `scripts/` | Training, generation, and evaluation entry points |
-| `scripts/analysis/` | Memorization, diversity, and ResNet transfer experiments |
+| `scripts/` | Data building, training, generation, and evaluation entry points |
+| `scripts/analysis/` | Memorization, diversity, confidence intervals, ResNet transfer |
+| `scripts/site/` | Builders for the companion page's data and audio |
 
 ## Reproducing the paper
 
-Every number below comes from the released checkpoints via the commands
-shown. Times are for an M-series laptop (MPS).
+Run from the repository root after downloading the checkpoints and building
+the data. Times are for an Apple-silicon laptop unless noted.
 
-| Paper result | Command | Expected | Runtime |
+| Paper result | Script | Expected | Time |
 |---|---|---|---|
-| Table 1, PiJAMA-12 classifier | `evaluate_classifier.py` with the classifier checkpoint | 95.8 chunk / 98.8 track | ~3 min |
-| Table 3, synthetic-only classifier | `evaluate_classifier.py` with the synthetic classifier | 87.1 chunk / 95.0 track | ~3 min |
-| Table 3, from-scratch ResNet-50 | `analysis/train_resnet_transfer.py --eval-checkpoint` | 70.2 clip / 90.0 track¹ | ~10 min |
-| Figure 6, characteristic regions | `characteristic_regions.py --artist "Art Tatum" --track-contains Sophisticated` | peak z +1.9 / trough z −1.2 | ~1 min |
-| Figure 3, agreement curves | `agreement_eval.py --prompt-length 256` | ~70% mean agreement | hours² |
-| Table 2, perplexity | `train_cross_attention.py` validation pass | CA 6.82 / FT 6.96 | ~1 h² |
+| Table 1, PiJAMA-12 classifier | `evaluate_classifier.py` with `checkpoints/classifier/best.pt` | 95.8 chunk / 98.8 track | ~3 min |
+| Table 3, synthetic-only classifier | `evaluate_classifier.py` with `checkpoints/synthetic-classifier/best.pt` | 87.1 chunk / 95.0 track | ~3 min |
+| Table 2, perplexity | `perplexity_eval.py --model-type {cross_attention,baseline,pretrained}` on `pijama12_4096/test.jsonl` | 6.82 / 6.96 / 11.41 | ~20 min each |
+| Table 2 / Fig. 3, agreement | `agreement_eval.py --prompt-length 256` on `pijama12_4096/val.jsonl`; `--base-checkpoint` for the two baselines | 70 / 37 / 25% | GPU hours¹ |
+| Fig. 6, per-pianist agreement | `per_artist_mean_agreement` in the same output | 96% (Hank Jones) … 29% (Cedar Walton) | — |
+| Table 2 CIs, Hyman sink | `analysis/bootstrap_cis.py` over the agreement and classifier outputs | e.g. 70 [64, 75] | ~1 min |
+| Fig. 5, characteristic regions | `characteristic_regions.py --save-excerpts` on `pijama12_1024/test.jsonl` | median peak z 0.90, max 1.99; Tatum "Sophisticated Lady" +1.9 / −1.2 | ~20 min |
+| Section 6, memorization | `analysis/jaccard_top2.py --source-map` over the synthetic corpus | 0.20 generated vs 0.32 real | CPU-bound |
+| Section 6, diversity | `analysis/measure_diversity.py` | same-artist 1.5–3.5× between-artist | minutes |
+| Table 3, from-scratch ResNet-50 | `analysis/build_resnet_transfer_clips.py`, then `analysis/train_resnet_transfer.py` | 70.2 clip / 91.3 track (synthetic arm) | GPU hours; eval ~10 min |
 
-¹ Track accuracy by mean softmax; the paper's 91.3 is majority vote over the
-same predictions.
-² Generation-bound; practical on a CUDA GPU, slow on a laptop.
+¹ Generation-bound: 175 continuations of 4,096 tokens per mode and prompt
+length. Practical on a CUDA GPU (`--batch-size 16`), slow on a laptop.
 
-Track-level majority vote breaks exact ties by mean logit — the convention
-stated in the paper's tables and implemented in
-`llama_pijama/evaluation/track_aggregation.py`.
+Track-level accuracy is a majority vote over chunks, with exact ties broken by
+mean logit among the tied pianists, as stated in the paper's tables.
+
+Not included: the DPI-20 benchmark (Table 1, top rows) uses Cheston et al.'s
+data and splits; the PiJAMA-30 classifier (Table 1) uses the same training
+script on the 30-artist data; the paper's figures were drawn from these
+outputs with plotting code not released here.
 
 ## Training
+
+The generator (about 18 hours on one 24 GB GPU):
 
 ```bash
 python scripts/train_cross_attention.py \
     --train-jsonl data/pijama12_4096/train.jsonl \
     --val-jsonl data/pijama12_4096/val.jsonl \
-    --pretrained-checkpoint checkpoints/aria-medium-gen.safetensors \
-    --out-dir checkpoints/run1
+    --pretrained-checkpoint /path/to/aria-medium-base/model.safetensors \
+    --out-dir checkpoints/generator_run
 ```
 
-Defaults reproduce the paper's run: cross-attention on the last 8 of 16
-layers, a 4-vector artist context, 15 epochs at effective batch size 32, peak
-LR 5e-6 with half an epoch of warmup then cosine decay, weight decay 0.02,
-fp16, seed 42. `--no-cross-attention` trains the unconditioned ablation.
+Defaults are the paper's run: cross-attention on the last 8 of 16 layers, a
+4-vector artist context, gate initialised at 0.1, embedding dropout 0.3,
+15 epochs at effective batch size 32, peak learning rate 5e-6 with half an
+epoch of warmup then cosine decay, weight decay 0.02, fp16.
+`--no-cross-attention` trains the fine-tuned baseline.
 
-## Checkpoints
+The classifier (the same recipe trains the PiJAMA-12, PiJAMA-30 and
+synthetic-only models; only the data changes):
 
-Released on the Hugging Face Hub (see the demo page for links): the
-conditioned generator, the PiJAMA-12 classifier used as the evaluation
-instrument, and the classifier trained only on generated music.
+```bash
+python scripts/train_classifier.py \
+    --train-jsonl data/pijama12_1024/train.jsonl \
+    --val-jsonl data/pijama12_1024/val.jsonl \
+    --artist-map data/pijama12_1024/artist_to_id.json \
+    --out-dir checkpoints/classifier_run
+```
 
 ## License
 
