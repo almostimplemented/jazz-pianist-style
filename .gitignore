@@ -12,6 +12,5 @@ data/eval/
 results/
 samples/
 render/
-docs/audio/*.m4a
 release/huggingface/bundles/
 release/recovered/
