@@ -42,6 +42,8 @@ def parse_args():
     ap.add_argument("--real-test", type=Path)
     ap.add_argument("--synth-train", type=Path, help="generated continuations, 1024-token chunks")
     ap.add_argument("--synth-val", type=Path)
+    ap.add_argument("--artist-map", type=Path, default=None,
+                    help="artist_to_id.json to copy in (default: sorted labels found)")
     ap.add_argument("--out-dir", type=Path, default=Path("data/resnet_transfer"))
     args = ap.parse_args()
     if not any([args.real_train, args.real_val, args.real_test, args.synth_train, args.synth_val]):
@@ -65,6 +67,7 @@ def main():
         "synth_val": (args.synth_val, "generation_idx", "chunk_idx"),
     }
     tokenizer = AbsTokenizer()
+    labels = set()
     for split, (path, group_key, sort_key) in sources.items():
         if path is None:
             continue
@@ -98,8 +101,14 @@ def main():
             w = csv.DictWriter(f, fieldnames=["file", "label", "group", "duration_s"])
             w.writeheader()
             w.writerows(rows)
+        labels.update(r["label"] for r in rows)
         total_dur = sum(r["duration_s"] for r in rows) / 3600
         print(f"{split}: {len(rows)} files ({skipped} skipped), {total_dur:.1f} h")
+    # The trainer reads the label order from here
+    mapping = (json.loads(args.artist_map.read_text()) if args.artist_map
+               else {a: i for i, a in enumerate(sorted(labels))})
+    (out / "artist_to_id.json").write_text(json.dumps(mapping, indent=1))
+    print(f"artist_to_id.json: {len(mapping)} artists")
 
 
 if __name__ == "__main__":

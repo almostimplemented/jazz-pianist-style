@@ -14,12 +14,12 @@ Typical interpretation:
       within << 1.0     -> healthy; generator has learned style variation
     within ~ 1.0         -> COLLAPSE; generator produces near-duplicates
 
-Usage:
-    uv run python scripts/paper/measure_diversity.py \
-        --jsonl /tmp/synth_cleaned_classifier/train.jsonl \
-        --n 8 \
+Usage (the paper reports n=4; n=6 and n=8 as sensitivity checks):
+    python scripts/analysis/measure_diversity.py \
+        --jsonl data/synthetic/train.jsonl \
+        --n 4 \
         --max-pairs-per-artist 500 \
-        --output-json /tmp/diversity.json
+        --output-json results/diversity_synth_n4.json
 
 The `--jsonl` file should be in classifier format (seq + metadata.artist).
 """
@@ -93,7 +93,7 @@ def summarize(values: List[float]) -> dict:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--jsonl", required=True, help="classifier-format jsonl (seq + metadata.artist)")
-    p.add_argument("--n", type=int, default=8, help="n-gram size (default: 8)")
+    p.add_argument("--n", type=int, default=4, help="n-gram size (default: 4, as in the paper)")
     p.add_argument("--max-pairs-per-artist", type=int, default=500,
                    help="max within-artist pairs to sample per artist (default: 500)")
     p.add_argument("--max-between-pairs", type=int, default=5000,

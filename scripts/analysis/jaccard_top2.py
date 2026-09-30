@@ -89,6 +89,10 @@ def main():
                     help="reference set to scan against (default: train)")
     ap.add_argument("--out-dir", default="results/jaccard_top2",
                     help="directory for the result JSON")
+    ap.add_argument("--source-map", default=None,
+                    help="JSON mapping query id -> the track_id it was prompted from "
+                         "(e.g. the generation provenance). Adds top1 excluding each "
+                         "query's own source recording: the paper's 0.20")
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
 
@@ -149,6 +153,16 @@ def main():
                   "p95": round(float(np.percentile(ratios, 95)), 3), "max": round(float(ratios.max()), 3)},
         "n_ratio_gt_1.5": int((ratios > 1.5).sum()), "n_ratio_gt_2": int((ratios > 2.0).sum()),
     }
+    if args.source_map:
+        # A continuation naturally resembles the recording it was prompted from;
+        # the memorization question is closeness to any OTHER training track.
+        source = {str(k): (v["track_id"] if isinstance(v, dict) else v)
+                  for k, v in json.loads(Path(args.source_map).read_text()).items()}
+        excl = np.array([r["top2"] if r["top1_track"] == source.get(r["query"]) else r["top1"]
+                         for r in rows])
+        summary["top1_excl_own_source"] = {
+            "mean": round(float(excl.mean()), 4), "max": round(float(excl.max()), 4),
+            "p95": round(float(np.percentile(excl, 95)), 4)}
     (out_dir / f"{args.name}.json").write_text(json.dumps({"summary": summary, "rows": rows}, indent=1))
     print(json.dumps(summary, indent=1))
 

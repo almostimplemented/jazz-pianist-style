@@ -11,8 +11,9 @@ repo: SGD lr=0.01 momentum=0.9 wd=1e-4, cosine schedule, batch 5, CE loss,
 augmentation (their augment_midi: transpose +/-6, dilate 0.2, velocity 12)
 with p=0.5 and clip-start jitter at train time only.
 
-Eval: --eval-checkpoint scores the real test split (clip top-1 + per-track
-mean-softmax accuracy).
+Eval: --eval-checkpoint scores the real test split: clip top-1, and track
+accuracy by majority vote (ties broken by mean logit; the paper's number) and
+by mean softmax.
 
 Everything runs locally (MPS/CPU); no cluster dependency.
 """
@@ -105,13 +106,23 @@ def collate(batch):
     return x, y, idx
 
 
+def majority_vote(logit_rows):
+    """Most-voted class over a track's clips; exact vote ties go to the tied
+    class with the highest mean logit (the paper-wide convention)."""
+    logits = np.stack(logit_rows)
+    votes = np.bincount(logits.argmax(1), minlength=logits.shape[1])
+    tied = np.flatnonzero(votes == votes.max())
+    return int(tied[logits[:, tied].mean(0).argmax()])
+
+
 @torch.no_grad()
 def evaluate(model, ds, device, batch_size, max_batches=None):
-    """Returns clip accuracy + per-track mean-softmax accuracy."""
+    """Clip accuracy, plus track accuracy by majority vote (the paper's number)
+    and by mean softmax."""
     model.eval()
     dl = DataLoader(ds, batch_size=batch_size, num_workers=4, collate_fn=collate)
     correct = total = 0
-    track_probs = defaultdict(list)
+    track_logits = defaultdict(list)
     track_label = {}
     for bi, batch in enumerate(dl):
         if batch is None:
@@ -119,20 +130,24 @@ def evaluate(model, ds, device, batch_size, max_batches=None):
         if max_batches and bi >= max_batches:
             break
         x, y, idx = batch
-        probs = torch.softmax(model(x.to(device)), dim=-1).cpu()
-        correct += int((probs.argmax(1) == y).sum())
+        logits = model(x.to(device)).float().cpu()
+        correct += int((logits.argmax(1) == y).sum())
         total += len(y)
-        for p, yy, ii in zip(probs, y, idx):
+        for lg, yy, ii in zip(logits, y, idx):
             g = ds.items[int(ii)][3]
-            track_probs[g].append(p.numpy())
+            track_logits[g].append(lg.numpy())
             track_label[g] = int(yy)
-    clip_acc = correct / max(total, 1)
-    tr_correct = sum(
-        int(np.stack(v).mean(0).argmax() == track_label[g]) for g, v in track_probs.items()
-    )
-    track_acc = tr_correct / max(len(track_probs), 1)
     model.train()
-    return clip_acc, track_acc, total, len(track_probs)
+    n_tracks = max(len(track_logits), 1)
+    softmax = lambda a: np.exp(a - a.max(1, keepdims=True)) / np.exp(a - a.max(1, keepdims=True)).sum(1, keepdims=True)
+    return {
+        "clip_acc": correct / max(total, 1),
+        "track_acc_majority_vote": sum(majority_vote(v) == track_label[g]
+                                       for g, v in track_logits.items()) / n_tracks,
+        "track_acc_mean_softmax": sum(int(softmax(np.stack(v)).mean(0).argmax() == track_label[g])
+                                      for g, v in track_logits.items()) / n_tracks,
+        "n_clips": total, "n_tracks": len(track_logits),
+    }
 
 
 def main():
@@ -160,9 +175,10 @@ def main():
         sd = torch.load(args.eval_checkpoint, map_location="cpu")
         model.load_state_dict(sd["model"])
         test_ds = ClipDataset(BASE / "real_test_index.csv", augment=False)
-        clip_acc, track_acc, n_clips, n_tracks = evaluate(model, test_ds, device, args.batch_size)
-        result = {"checkpoint": str(args.eval_checkpoint), "test_clip_acc": round(clip_acc, 4),
-                  "test_track_acc": round(track_acc, 4), "n_clips": n_clips, "n_tracks": n_tracks}
+        m = evaluate(model, test_ds, device, args.batch_size)
+        result = {"checkpoint": str(args.eval_checkpoint),
+                  **{f"test_{k}" if "acc" in k else k: (round(v, 4) if isinstance(v, float) else v)
+                     for k, v in m.items()}}
         print(json.dumps(result))
         out = args.eval_checkpoint.parent / "test_eval.json"
         out.write_text(json.dumps(result, indent=1))
@@ -207,7 +223,8 @@ def main():
             run_loss += float(loss)
             n_batches += 1
         sched.step()
-        val_clip, val_track, _, _ = evaluate(model, val_ds, device, args.batch_size)
+        vm = evaluate(model, val_ds, device, args.batch_size)
+        val_clip, val_track = vm["clip_acc"], vm["track_acc_majority_vote"]
         entry = {"epoch": epoch, "train_loss": round(run_loss / max(n_batches, 1), 4),
                  "val_clip_acc": round(val_clip, 4), "val_track_acc": round(val_track, 4),
                  "lr": sched.get_last_lr()[0]}
