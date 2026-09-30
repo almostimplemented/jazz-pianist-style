@@ -1,8 +1,7 @@
-/* One prompt, twelve pianists — live style-swap player.
+/* One prompt, twelve pianists.
  *
- * Every take shares an opening prompt and then diverges, so playback keeps a
- * single clock: switching pianist mid-performance changes which take is
- * sounding from that moment on, at the same position in the music.
+ * Every take shares an opening prompt and then diverges. Choosing a pianist
+ * plays that take from the top.
  */
 (() => {
   "use strict";
@@ -60,7 +59,6 @@
       return;                    // the browser refused to start playback
     }
     setPlayButton(true);
-    voice.warm(data.artists.map(clipId));   // so later swaps are instant
   }
 
   function stop() {
@@ -76,22 +74,21 @@
   /* ---------- artist swap ---------- */
 
   function setArtist(idx) {
+    const wasPlaying = voice.playing;
+    if (wasPlaying) voice.stop();
     active = idx;
     const a = data.artists[idx];
     el.current.textContent = a.name;
     [...el.artists.children].forEach((b, i) =>
       b.setAttribute("aria-pressed", String(i === idx)));
-    // Each take has its own length: keep the listener at the same moment in
-    // the music, and rescale the timeline to the take they are now hearing.
+    // Each take is its own piece of music with its own length: start it from
+    // the top, so every pianist is heard coming out of the same opening.
     durationMs = a.duration_ms;
     el.seek.max = String(durationMs);
     voice.setEnd(durationMs);
-    if (voice.nowMs() >= durationMs) {   // this take is already over by that point
-      stop();
-      voice.position = durationMs;
-    } else {
-      voice.switchTo(clipId(a), a.notes);
-    }
+    voice.position = 0;
+    if (wasPlaying) play();
+    else setPlayButton(false);
     draw();
   }
 
